@@ -1,7 +1,6 @@
 // =============================================
 // BALLOON TD 6 - GAME DATA
 // =============================================
-a
 // ---------- DIFFICULTIES ----------
 const DIFFICULTIES = {
   easy:       { name:'Easy',       cash:650, lives:200, hpMul:0.75, speedMul:0.9,  cashMul:1.15, reward:1.0, endRound:40,  color:'#2ecc71', desc:'Relaxed. Weaker bloons, more starting lives. Ends round 40.' },
