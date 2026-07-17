@@ -1,341 +1,1369 @@
 // =============================================
-// BALLOON TD 6 - GAME DATA
+// BALLOON TD 6 - GAME ENGINE
 // =============================================
 
-// ---------- DIFFICULTIES ----------
-const DIFFICULTIES = {
-  easy:       { name:'Easy',       cash:650, lives:200, hpMul:0.75, speedMul:0.9,  cashMul:1.15, reward:1.0, endRound:40,  color:'#2ecc71', desc:'Relaxed. Weaker bloons, more starting lives. Ends round 40.' },
-  normal:     { name:'Medium',     cash:650, lives:150, hpMul:1.0,  speedMul:1.0,  cashMul:1.0,  reward:1.5, endRound:60,  color:'#3498db', desc:'The standard challenge. Ends round 60.' },
-  hard:       { name:'Hard',       cash:600, lives:100, hpMul:1.35, speedMul:1.12, cashMul:0.9,  reward:2.5, endRound:80,  color:'#e67e22', desc:'Tougher bloons, fewer lives, less cash. Ends round 80.' },
-  impossible: { name:'Impossible', cash:500, lives:1,   hpMul:1.8,  speedMul:1.3,  cashMul:0.8,  reward:5.0, endRound:100, color:'#e74c3c', desc:'One life. Brutal bloons. Only for masters. Ends round 100.' },
-  sandbox:    { name:'Sandbox',    cash:9999999, lives:999999, hpMul:1.0, speedMul:1.0, cashMul:1.0, reward:0, endRound:99999, color:'#ff4da6', desc:'Free play & testing.' },
-};
+// ---------- PERSISTENT PROFILE ----------
+const SAVE_KEY = 'btd6_profile';
+let profile = { monkeyMoney: 0, upgrades: {} };
 
-// ---------- MAPS (with 3D line-of-sight obstacles) ----------
-// obstacles: {x,y,r} in normalized (0-1) coords, block projectile line-of-sight
-const MAPS = {
-  monkey_meadow: {
-    name: 'Monkey Meadow', difficulty:'Beginner', bg:'#1f3d1f', pathColor:'#5a3d2b',
-    path: [[-0.03,0.2],[0.15,0.2],[0.15,0.7],[0.35,0.7],[0.35,0.3],[0.55,0.3],[0.55,0.75],[0.75,0.75],[0.75,0.15],[1.03,0.15]],
-    obstacles: [],
-  },
-  logs: {
-    name: 'Logs', difficulty:'Beginner', bg:'#25301a', pathColor:'#4a3520',
-    path: [[-0.03,0.5],[0.25,0.5],[0.25,0.2],[0.5,0.2],[0.5,0.8],[0.75,0.8],[0.75,0.4],[1.03,0.4]],
-    obstacles: [{x:0.62,y:0.55,r:0.06,type:'log'}],
-  },
-  winding_way: {
-    name: 'Winding Way', difficulty:'Intermediate', bg:'#1a2e35', pathColor:'#40352a',
-    path: [[-0.03,0.15],[0.85,0.15],[0.85,0.4],[0.15,0.4],[0.15,0.65],[0.85,0.65],[0.85,0.88],[-0.03,0.88]],
-    obstacles: [{x:0.5,y:0.28,r:0.05,type:'tree'},{x:0.5,y:0.52,r:0.05,type:'tree'}],
-  },
-  spiral: {
-    name: 'Spiral', difficulty:'Intermediate', bg:'#2e1a35', pathColor:'#3a2a40',
-    path: [[-0.03,0.1],[0.9,0.1],[0.9,0.9],[0.1,0.9],[0.1,0.3],[0.7,0.3],[0.7,0.7],[0.35,0.7],[0.35,0.5],[1.03,0.5]],
-    obstacles: [{x:0.5,y:0.5,r:0.07,type:'boulder'}],
-  },
-  crossroads: {
-    name: 'Cross Roads', difficulty:'Advanced', bg:'#33251a', pathColor:'#4a3520',
-    path: [[0.5,-0.03],[0.5,0.35],[0.15,0.35],[0.15,0.65],[0.85,0.65],[0.85,0.35],[0.5,0.35],[0.5,1.03]],
-    obstacles: [{x:0.3,y:0.5,r:0.05,type:'boulder'},{x:0.7,y:0.5,r:0.05,type:'boulder'}],
-  },
-  volcano: {
-    name: 'Volcano', difficulty:'Expert', bg:'#301515', pathColor:'#4a2520',
-    path: [[-0.03,0.5],[0.2,0.5],[0.2,0.15],[0.5,0.15],[0.5,0.85],[0.8,0.85],[0.8,0.5],[0.5,0.5],[0.5,0.35],[1.03,0.35]],
-    obstacles: [{x:0.35,y:0.5,r:0.06,type:'boulder'},{x:0.65,y:0.35,r:0.05,type:'boulder'},{x:0.5,y:0.65,r:0.05,type:'tree'}],
-  },
-};
-
-// ---------- HEROES ----------
-const HERO_DEFS = [
-  {
-    id:'quincy', name:'Quincy', icon:'🏹', color:'#2ecc71', hero:true, cost:540,
-    desc:'Affordable starter hero. Reliable long-range camo-popping arrows.',
-    range:170, fireRate:1.1, damage:1, projectileSpeed:420, projectileRadius:5, pierce:2, camo:false,
-    levelUps:[ // stats gained per level (1->20)
-      {fireRate:0.06,damage:0,pierce:0.1,range:2},
-    ],
-    special:'At lvl 3 gains camo detection. Arrows pierce more each level.',
-    ability:{ name:'Storm of Arrows', lvl:7, cooldown:20, desc:'Fires a huge volley across the screen.' },
-    heroKind:'quincy',
-  },
-  {
-    id:'gwendolin', name:'Gwendolin', icon:'🔥', color:'#e67e22', hero:true, cost:750,
-    desc:'Fire specialist. Clears huge groups and buffs nearby towers with heat.',
-    range:150, fireRate:1.3, damage:2, projectileSpeed:340, projectileRadius:7, pierce:3, camo:false,
-    special:'Attacks deal burning DoT. Nearby towers gain +attack speed. Pops lead at lvl 5.',
-    ability:{ name:'Cocktail of Fire', lvl:7, cooldown:22, desc:'Douses the track in flames, burning all bloons.' },
-    heroKind:'gwendolin', dot:1, dotInterval:0.5, buffAllies:true,
-  },
-  {
-    id:'obyn', name:'Obyn Greenfoot', icon:'🌲', color:'#27ae60', hero:true, cost:650,
-    desc:'Nature hero. Heavily boosts Magic towers, especially top-path Druids.',
-    range:160, fireRate:1.0, damage:2, projectileSpeed:330, projectileRadius:8, pierce:4, camo:true,
-    special:'Buffs all Magic-class towers (+pierce, +range). Spawns Spirit of the Forest wolves.',
-    ability:{ name:'Wall of Trees', lvl:7, cooldown:25, desc:'Summons trees that block & pop bloons.' },
-    heroKind:'obyn', buffMagic:true,
-  },
-  {
-    id:'benjamin', name:'Benjamin', icon:'💻', color:'#9b59b6', hero:true, cost:1200,
-    desc:'Code Monkey. Hacks the economy for massive passive cash & bonus lives.',
-    range:120, fireRate:0.5, damage:0, projectileSpeed:300, projectileRadius:4, pierce:1, camo:false,
-    special:'Generates cash every round (scales with level). Adds lives. Cannot attack early.',
-    ability:{ name:'Syphon Funding', lvl:7, cooldown:30, desc:'Instantly generates a large cash sum.' },
-    heroKind:'benjamin', roundIncome:200, extraLives:1,
-  },
-  {
-    id:'ezili', name:'Ezili', icon:'🔮', color:'#8e44ad', hero:true, cost:600,
-    desc:'Voodoo Monkey. Hexes MOAB-class and pops all bloon types.',
-    range:150, fireRate:0.9, damage:2, projectileSpeed:320, projectileRadius:7, pierce:2, camo:true,
-    special:'Deals bonus damage to MOAB-class. Pops lead & purple. Applies hex DoT.',
-    ability:{ name:'MOAB Hex', lvl:7, cooldown:26, desc:'Instantly destroys a MOAB-class bloon over time.' },
-    heroKind:'ezili', moabDamage:3, dot:1, dotInterval:0.4,
-  },
-  {
-    id:'sauda', name:'Sauda', icon:'⚔️', color:'#e74c3c', hero:true, cost:600,
-    desc:'Swordmaster. Excels at close-range damage and solos early rounds easily.',
-    range:110, fireRate:3.0, damage:2, projectileSpeed:9999, projectileRadius:0, pierce:5, camo:true,
-    special:'Instant melee slashes hit all bloons in range. Devastating early game.',
-    ability:{ name:'Leaping Sword', lvl:7, cooldown:18, desc:'Leaps and slices all bloons on screen.' },
-    heroKind:'sauda', melee:true,
-  },
-  {
-    id:'geraldo', name:'Geraldo', icon:'🎩', color:'#d4a017', hero:true, cost:745,
-    desc:'Merchant hero. Access a unique item shop for highly versatile strategies.',
-    range:150, fireRate:1.1, damage:1, projectileSpeed:350, projectileRadius:6, pierce:2, camo:false,
-    special:'Sells consumable items (in his upgrade panel): sharpening stones, glue, etc. Generates cash.',
-    ability:{ name:'Fantastic Saloon', lvl:7, cooldown:1, desc:'Restock the item shop.' },
-    heroKind:'geraldo', roundIncome:80, itemShop:true,
-  },
-  {
-    id:'adora', name:'Adora', icon:'☀️', color:'#f1c40f', hero:true, cost:1000,
-    desc:'High Priestess. Sacrifice other towers to rapidly increase her huge damage.',
-    range:165, fireRate:1.4, damage:3, projectileSpeed:400, projectileRadius:7, pierce:3, camo:false,
-    special:'Very high base damage. Use ability to sacrifice a nearby tower and gain permanent XP/damage.',
-    ability:{ name:'Blood Sacrifice', lvl:3, cooldown:15, desc:'Sacrifice the weakest nearby tower for big permanent damage.' },
-    heroKind:'adora',
-  },
-  {
-    id:'etienne', name:'Etienne', icon:'🛰️', color:'#1abc9c', hero:true, cost:800,
-    desc:'Drone commander. Provides map-wide camo detection to ALL towers at level 8.',
-    range:180, fireRate:2.0, damage:1, projectileSpeed:450, projectileRadius:4, pierce:2, camo:true,
-    special:'Commands drones. At lvl 8 grants global camo detection to every tower you own.',
-    ability:{ name:'UCAV', lvl:7, cooldown:24, desc:'Deploys an attack drone that strafes bloons.' },
-    heroKind:'etienne', globalCamoLvl:8,
-  },
-];
-
-// ---------- TOWERS (full BTD6 roster) ----------
-const TOWER_DEFS = [
-  // ===== PRIMARY =====
-  { id:'dart', name:'Dart Monkey', icon:'🐒', color:'#8B6914', cost:200, category:'PRIMARY', desc:'Basic tower. Throws darts at bloons.', range:140, fireRate:1.2, damage:1, projectileSpeed:320, projectileRadius:5, pierce:2,
-    upgrades:[
-      {name:'Sharp Shots',levels:[{name:'Sharp Shots',cost:140,desc:'Pop 2 bloons',effect:{pierce:3}},{name:'Razor Sharp Shots',cost:170,desc:'Pop 4 bloons',effect:{pierce:5}},{name:'Spike-o-pult',cost:400,desc:'Large spike balls',effect:{pierce:18,damage:2,projectileRadius:10}},{name:'Juggernaut',cost:1800,desc:'Massive spike balls',effect:{pierce:100,damage:5,projectileRadius:16,lead:true}},{name:'Ultra-Juggernaut',cost:32000,desc:'Godly spike balls',effect:{pierce:300,damage:10,projectileRadius:22,lead:true}}]},
-      {name:'Quick Shots',levels:[{name:'Quick Shots',cost:100,desc:'Faster attack',effect:{fireRateMul:1.33}},{name:'Very Quick Shots',cost:190,desc:'Even faster',effect:{fireRateMul:1.43}},{name:'Triple Shot',cost:500,desc:'3 darts at once',effect:{numProjectiles:3}},{name:'Super Monkey Fan Club',cost:9000,desc:'Rapid darts',effect:{numProjectiles:5,fireRateMul:2}},{name:'Plasma Monkey Fan Club',cost:18000,desc:'Plasma darts',effect:{numProjectiles:7,fireRateMul:2.5,damage:3}}]},
-      {name:'Long Range',levels:[{name:'Long Range Darts',cost:100,desc:'More range',effect:{rangeMul:1.2}},{name:'Enhanced Eyesight',cost:130,desc:'Range + camo',effect:{rangeMul:1.3,camo:true}},{name:'Crossbow',cost:650,desc:'Faster longer darts',effect:{rangeMul:1.4,fireRateMul:1.5,damage:2}},{name:'Sharp Shooter',cost:1200,desc:'Crit hits',effect:{rangeMul:1.6,camo:true,fireRateMul:1.8}},{name:'Crossbow Master',cost:35000,desc:'Incredible speed',effect:{rangeMul:2,fireRateMul:5,damage:8,pierce:20}}]}
-    ]},
-  { id:'boomerang', name:'Boomerang Monkey', icon:'🪃', color:'#c0392b', cost:325, category:'PRIMARY', desc:'Boomerangs curve through multiple bloons.', range:150, fireRate:0.8, damage:1, projectileSpeed:300, projectileRadius:7, pierce:6,
-    upgrades:[
-      {name:'Improved Rangs',levels:[{name:'Improved Rangs',cost:150,desc:'More pierce',effect:{pierce:8}},{name:'Glaives',cost:200,desc:'Faster',effect:{fireRateMul:1.33}},{name:'Glaive Ricochet',cost:1000,desc:'Bounces',effect:{lead:true,pierce:16,damage:2}},{name:'MOAB Press',cost:2500,desc:'Stuns MOABs',effect:{moabDmg:5,pierce:20,damage:3}},{name:'MOAB Domination',cost:45000,desc:'Dominates MOABs',effect:{moabDmg:50,pierce:60,damage:10,fireRateMul:2}}]},
-      {name:'Multiple Rangs',levels:[{name:'Multi-Target',cost:300,desc:'Throws 2',effect:{numProjectiles:2}},{name:'Bionic Boomerang',cost:800,desc:'Faster',effect:{numProjectiles:2,fireRateMul:2}},{name:'Turbo Charge',cost:1200,desc:'Ability rangs',effect:{numProjectiles:3,fireRateMul:2.5,damage:2}},{name:'Perma Charge',cost:9000,desc:'Always charged',effect:{numProjectiles:4,fireRateMul:3,damage:3,pierce:12}},{name:'Glaive Lord',cost:45000,desc:'Orbiting glaives',effect:{numProjectiles:6,fireRateMul:2,damage:15,pierce:100}}]},
-      {name:'Long Range Rangs',levels:[{name:'Long Range Rangs',cost:200,desc:'Longer range',effect:{rangeMul:1.3}},{name:'Red Hot Rangs',cost:300,desc:'Pops lead',effect:{lead:true,damage:2}},{name:'Kylie Boomerang',cost:1200,desc:'Returns fast',effect:{pierce:20,damage:2,numProjectiles:2}},{name:'Glaive Ricochet',cost:5000,desc:'Bounces around',effect:{damage:5,pierce:40,numProjectiles:3}},{name:'Glaive Lord',cost:35000,desc:'Ultimate',effect:{damage:15,pierce:100,numProjectiles:4,fireRateMul:2}}]}
-    ]},
-  { id:'bomb', name:'Bomb Shooter', icon:'💣', color:'#2c3e50', cost:500, category:'PRIMARY', desc:'Explodes on impact. Great for clusters & Leads.', range:160, fireRate:0.6, damage:1, projectileSpeed:200, projectileRadius:8, explodeRadius:30, isExplosive:true, pierce:20,
-    upgrades:[
-      {name:'Bigger Bombs',levels:[{name:'Bigger Bombs',cost:350,desc:'Bigger blasts',effect:{explodeRadiusMul:1.4}},{name:'Heavy Bombs',cost:550,desc:'+damage',effect:{explodeRadiusMul:1.6,damage:2}},{name:'Really Big Bombs',cost:1200,desc:'Massive',effect:{explodeRadiusMul:2,damage:3}},{name:'Bloon Impact',cost:3000,desc:'Stuns',effect:{explodeRadiusMul:2.2,damage:4,stun:1}},{name:'Bloon Crush',cost:35000,desc:'Crushes MOABs',effect:{explodeRadiusMul:3,damage:12,moabDmg:20}}]},
-      {name:'Faster Reload',levels:[{name:'Faster Reload',cost:250,desc:'Reload faster',effect:{fireRateMul:1.33}},{name:'Missile Launcher',cost:350,desc:'Faster',effect:{fireRateMul:1.5}},{name:'MOAB Mauler',cost:900,desc:'MOAB damage',effect:{fireRateMul:1.6,moabDmg:5,damage:2}},{name:'MOAB Assassin',cost:3600,desc:'Assassinates',effect:{fireRateMul:2,moabDmg:100,damage:4}},{name:'MOAB Eliminator',cost:26000,desc:'Eliminates',effect:{fireRateMul:3,moabDmg:1000,damage:10}}]},
-      {name:'Extra Range',levels:[{name:'Extra Range',cost:150,desc:'More range',effect:{rangeMul:1.2}},{name:'Frag Bombs',cost:300,desc:'Fragments',effect:{rangeMul:1.3,pierce:30}},{name:'Cluster Bombs',cost:750,desc:'Clusters',effect:{rangeMul:1.4,damage:2}},{name:'Recursive Cluster',cost:2200,desc:'Chain clusters',effect:{rangeMul:1.6,damage:3,explodeRadiusMul:1.5}},{name:'Bomb Blitz',cost:45000,desc:'Blitz',effect:{rangeMul:2,damage:10,explodeRadiusMul:2,fireRateMul:2}}]}
-    ]},
-  { id:'tack', name:'Tack Shooter', icon:'📌', color:'#c0392b', cost:360, category:'PRIMARY', desc:'Shoots tacks in all directions.', range:100, fireRate:0.9, damage:1, projectileSpeed:280, projectileRadius:4, multiTarget:true, numProjectiles:8,
-    upgrades:[
-      {name:'Faster Shooting',levels:[{name:'Faster Shooting',cost:200,desc:'Faster',effect:{fireRateMul:1.33}},{name:'Even Faster',cost:200,desc:'Faster',effect:{fireRateMul:1.43}},{name:'Hot Shots',cost:600,desc:'Fire tacks',effect:{damage:2,fireRateMul:1.5,lead:true}},{name:'Ring of Fire',cost:3500,desc:'Fire ring',effect:{damage:5,fireRateMul:4,pierce:50,lead:true}},{name:'Inferno Ring',cost:45000,desc:'Inferno',effect:{damage:20,fireRateMul:6,pierce:200,lead:true}}]},
-      {name:'Extra Range',levels:[{name:'Extra Range Tacks',cost:100,desc:'Range',effect:{rangeMul:1.15}},{name:'Super Range',cost:150,desc:'Range',effect:{rangeMul:1.3}},{name:'Blade Shooter',cost:900,desc:'Blades',effect:{rangeMul:1.4,pierce:8,damage:2}},{name:'Blade Maelstrom',cost:3000,desc:'Blade storm',effect:{rangeMul:1.6,pierce:20,damage:5,fireRateMul:2}},{name:'Super Maelstrom',cost:30000,desc:'Ultimate',effect:{rangeMul:1.8,pierce:40,damage:12,fireRateMul:4}}]},
-      {name:'More Tacks',levels:[{name:'More Tacks',cost:150,desc:'10 tacks',effect:{numProjectiles:10}},{name:'Even More Tacks',cost:200,desc:'12 tacks',effect:{numProjectiles:12}},{name:'Tack Sprayer',cost:400,desc:'16 tacks',effect:{numProjectiles:16}},{name:'Overdrive',cost:2200,desc:'Overdrive',effect:{numProjectiles:20,fireRateMul:2}},{name:'The Tack Zone',cost:25000,desc:'Tack Zone',effect:{numProjectiles:32,fireRateMul:3,damage:3}}]}
-    ]},
-  { id:'iceP', name:'Ice Monkey', icon:'🧊', color:'#5dade2', cost:500, category:'PRIMARY', desc:'Freezes bloons in range.', range:110, fireRate:0.35, damage:0, freezeDuration:1.5, freezeRadius:110, isFreeze:true, projectileSpeed:999, projectileRadius:0,
-    upgrades:[
-      {name:'Permafrost',levels:[{name:'Permafrost',cost:200,desc:'Slows after',effect:{}},{name:'Cold Snap',cost:300,desc:'More power',effect:{}},{name:'Ice Shards',cost:1000,desc:'Shards',effect:{freezeRadiusMul:1.2}},{name:'Embrittlement',cost:2000,desc:'Vulnerable',effect:{freezeDurationMul:1.5,damage:1}},{name:'Super Brittle',cost:25000,desc:'Massive',effect:{freezeDurationMul:3,freezeRadiusMul:1.5,damage:3}}]},
-      {name:'Enhanced Freeze',levels:[{name:'Enhanced Freeze',cost:200,desc:'Longer',effect:{freezeDurationMul:1.5}},{name:'Deep Freeze',cost:300,desc:'Longer',effect:{freezeDurationMul:2}},{name:'Arctic Wind',cost:1500,desc:'Slow aura',effect:{freezeRadiusMul:1.4}},{name:'Snowstorm',cost:3000,desc:'Screen freeze',effect:{freezeDurationMul:2.5,freezeRadiusMul:1.6}},{name:'Absolute Zero',cost:26000,desc:'Global',effect:{freezeDurationMul:4,freezeRadiusMul:2}}]},
-      {name:'Larger Radius',levels:[{name:'Larger Radius',cost:100,desc:'Bigger',effect:{freezeRadiusMul:1.2}},{name:'Re-Freeze',cost:150,desc:'Refreeze',effect:{}},{name:'Cryo Cannon',cost:400,desc:'Larger',effect:{freezeRadiusMul:1.5}},{name:'Icicles',cost:1200,desc:'Icicles',effect:{freezeRadiusMul:1.8,damage:2}},{name:'Icicle Impale',cost:2500,desc:'Impale',effect:{freezeRadiusMul:2,damage:5}}]}
-    ]},
-  { id:'glue', name:'Glue Gunner', icon:'🫙', color:'#e67e22', cost:275, category:'PRIMARY', desc:'Slows bloons with sticky glue.', range:145, fireRate:0.7, damage:0, slowFactor:0.5, slowDuration:3.0, isGlue:true, projectileSpeed:280, projectileRadius:6, pierce:1,
-    upgrades:[
-      {name:'Glue Soak',levels:[{name:'Glue Soak',cost:170,desc:'Soaks layers',effect:{pierce:2}},{name:'Corrosive Glue',cost:300,desc:'Acid',effect:{dot:1,dotInterval:1}},{name:'Bloon Dissolver',cost:1400,desc:'Dissolves',effect:{dot:2,dotInterval:0.5}},{name:'Bloon Liquefier',cost:3500,desc:'Liquefies',effect:{dot:5,dotInterval:0.3}},{name:'The Bloon Solver',cost:30000,desc:'Solver',effect:{dot:12,dotInterval:0.1,pierce:999}}]},
-      {name:'Bigger Globs',levels:[{name:'Bigger Globs',cost:200,desc:'More hits',effect:{pierce:3}},{name:'Glue Splatter',cost:500,desc:'Splatter',effect:{pierce:6,explodeRadius:20}},{name:'Glue Hose',cost:1600,desc:'Fast',effect:{fireRateMul:3,pierce:15}},{name:'Glue Strike',cost:4000,desc:'MOAB glue',effect:{fireRateMul:3,pierce:20,moabDmg:2}},{name:'Glue Storm',cost:15000,desc:'Storm',effect:{fireRateMul:5,pierce:40,explodeRadius:40}}]},
-      {name:'Stronger Glue',levels:[{name:'Stickier Glue',cost:100,desc:'Lasts',effect:{slowDurationMul:1.5}},{name:'Slow-Setting',cost:200,desc:'Lasts more',effect:{slowDurationMul:2}},{name:'Relentless Glue',cost:500,desc:'Reapplies',effect:{slowDurationMul:3}},{name:'Super Glue',cost:1800,desc:'Stops bloons',effect:{slowFactor:0.1,slowDurationMul:4}},{name:'Bloon Glue',cost:22000,desc:'Permanent',effect:{slowFactor:0.05,dot:5,dotInterval:0.2}}]}
-    ]},
-  // ===== MILITARY =====
-  { id:'sniper', name:'Sniper Monkey', icon:'🎯', color:'#27ae60', cost:350, category:'MILITARY', desc:'Infinite range. High damage priority sniping.', range:9999, fireRate:0.4, damage:2, projectileSpeed:9999, projectileRadius:4, pierce:1,
-    upgrades:[
-      {name:'Full Metal Jacket',levels:[{name:'Full Metal Jacket',cost:350,desc:'Pops lead',effect:{damage:4,lead:true}},{name:'Large Calibre',cost:400,desc:'+dmg',effect:{damage:6}},{name:'Deadly Precision',cost:1000,desc:'MOAB dmg',effect:{damage:10,moabDmg:3}},{name:'Maim MOAB',cost:3000,desc:'Slows MOABs',effect:{damage:14,moabDmg:5,stun:0.5}},{name:'Cripple MOAB',cost:32000,desc:'Cripples',effect:{damage:40,moabDmg:15,stun:2}}]},
-      {name:'Night Vision',levels:[{name:'Night Vision Goggles',cost:250,desc:'Camo',effect:{camo:true}},{name:'Shrapnel Shot',cost:350,desc:'Shrapnel',effect:{pierce:3}},{name:'Bouncing Bullet',cost:1000,desc:'Bounces',effect:{pierce:5}},{name:'Supply Drop',cost:8500,desc:'Cash drops',effect:{pierce:6,roundIncome:300}},{name:'Elite Sniper',cost:14000,desc:'Elite',effect:{fireRateMul:3,damage:20,pierce:10}}]},
-      {name:'Semi-Automatic',levels:[{name:'Faster Firing',cost:200,desc:'Faster',effect:{fireRateMul:1.3}},{name:'Even Faster',cost:300,desc:'Faster',effect:{fireRateMul:1.5}},{name:'Semi-Automatic',cost:1500,desc:'Semi-auto',effect:{fireRateMul:2.5}},{name:'Full Auto Rifle',cost:5000,desc:'Full auto',effect:{fireRateMul:4}},{name:'Elite Defender',cost:15000,desc:'Elite defense',effect:{fireRateMul:8,damage:10}}]}
-    ]},
-  { id:'sub', name:'Monkey Sub', icon:'🚤', color:'#2980b9', cost:325, category:'MILITARY', desc:'Reveals camo, decimates MOABs.', range:160, fireRate:1.4, damage:1, projectileSpeed:340, projectileRadius:5, pierce:2,
-    upgrades:[
-      {name:'Barbed Darts',levels:[{name:'Longer Range',cost:100,desc:'Range',effect:{rangeMul:1.2}},{name:'Advanced Intel',cost:500,desc:'Screen range',effect:{rangeMul:5,camo:true}},{name:'Barbed Darts',cost:800,desc:'Pierce',effect:{pierce:6,damage:2}},{name:'Heat-tipped Darts',cost:1500,desc:'Lead',effect:{lead:true,damage:3,pierce:8}},{name:'Submerge & Support',cost:6000,desc:'Support',effect:{fireRateMul:2,damage:5}}]},
-      {name:'Ballistic Missile',levels:[{name:'Twin Guns',cost:400,desc:'Twin',effect:{fireRateMul:1.5,numProjectiles:2}},{name:'Airburst Darts',cost:550,desc:'Airburst',effect:{fireRateMul:1.7,pierce:6}},{name:'Ballistic Missile',cost:1200,desc:'Missiles',effect:{damage:3,explodeRadius:25,isExplosive:true}},{name:'First Strike',cost:18000,desc:'First strike',effect:{moabDmg:1000,damage:10}},{name:'Nautic Siege',cost:45000,desc:'Siege',effect:{fireRateMul:3,damage:15,pierce:20}}]},
-      {name:'Bloontonium',levels:[{name:'Bloontonium Reactor',cost:300,desc:'Aura dmg',effect:{camo:true}},{name:'Energizer',cost:900,desc:'Reactor',effect:{damage:2,pierce:5}},{name:'Reactor',cost:2500,desc:'Meltdown',effect:{damage:4,pierce:10}},{name:'Sub Commander',cost:4000,desc:'Commands',effect:{camo:true,rangeMul:2,fireRateMul:1.5}},{name:'Pre-Emptive Strike',cost:32000,desc:'Pre-emptive',effect:{fireRateMul:2,damage:8,pierce:15,moabDmg:5}}]}
-    ]},
-  { id:'buccaneer', name:'Monkey Buccaneer', icon:'⚓', color:'#16a085', cost:500, category:'MILITARY', desc:'Powerful ship w/ darts & grapes. Can make cash.', range:170, fireRate:1.0, damage:1, projectileSpeed:300, projectileRadius:5, pierce:2,
-    upgrades:[
-      {name:'Grape Shot',levels:[{name:'Faster Shooting',cost:250,desc:'Faster',effect:{fireRateMul:1.33}},{name:'Grape Shot',cost:350,desc:'Grapes',effect:{numProjectiles:5,pierce:3}},{name:'Cannon Ship',cost:1500,desc:'Cannon',effect:{damage:3,explodeRadius:20,isExplosive:true}},{name:'Monkey Pirates',cost:7000,desc:'Hook MOABs',effect:{damage:5,moabDmg:10,pierce:8}},{name:'Pirate Lord',cost:22000,desc:'Pirate Lord',effect:{damage:12,moabDmg:50,pierce:30}}]},
-      {name:'Destroyer',levels:[{name:'Long Range',cost:100,desc:'Range',effect:{rangeMul:1.2}},{name:'Double Shot',cost:500,desc:'Double',effect:{fireRateMul:1.5,numProjectiles:2}},{name:'Destroyer',cost:2500,desc:'Rapid',effect:{fireRateMul:3,damage:2}},{name:'Aircraft Carrier',cost:6500,desc:'Planes',effect:{fireRateMul:4,damage:3,pierce:5}},{name:'Carrier Flagship',cost:30000,desc:'Flagship',effect:{fireRateMul:5,damage:8,pierce:15}}]},
-      {name:'Merchantman',levels:[{name:'Crow\'s Nest',cost:350,desc:'Camo',effect:{camo:true,rangeMul:1.3}},{name:'Merchantman',cost:2700,desc:'+$ per round',effect:{roundIncome:200}},{name:'Favored Trades',cost:6500,desc:'+$$$',effect:{roundIncome:400,rangeMul:1.5}},{name:'Trade Empire',cost:20000,desc:'Empire',effect:{roundIncome:800,damage:5,fireRateMul:2}},{name:'Navarch of the Seas',cost:65000,desc:'Navarch',effect:{roundIncome:1500,damage:15,fireRateMul:3,pierce:20}}]}
-    ]},
-  { id:'ace', name:'Monkey Ace', icon:'✈️', color:'#8e44ad', cost:800, category:'MILITARY', desc:'Circles the map shredding bloons from the sky.', range:9999, fireRate:1.0, damage:1, projectileSpeed:360, projectileRadius:5, pierce:2, multiTarget:true, numProjectiles:8,
-    upgrades:[
-      {name:'Rapid Fire',levels:[{name:'Rapid Fire',cost:400,desc:'Faster',effect:{fireRateMul:1.5}},{name:'Lots More Darts',cost:350,desc:'+darts',effect:{numProjectiles:10}},{name:'Fighter Plane',cost:1700,desc:'Fighter',effect:{fireRateMul:2,damage:2}},{name:'Operation Dart Storm',cost:7500,desc:'Storm',effect:{fireRateMul:3,numProjectiles:16,damage:3}},{name:'Sky Shredder',cost:25000,desc:'Shredder',effect:{fireRateMul:5,numProjectiles:24,damage:6}}]},
-      {name:'Neva-Miss',levels:[{name:'Exploding Pineapple',cost:200,desc:'Bombs',effect:{explodeRadius:25,isExplosive:true}},{name:'Spy Plane',cost:500,desc:'Camo',effect:{camo:true}},{name:'Bomber Ace',cost:2000,desc:'Bomber',effect:{damage:3,explodeRadius:40,isExplosive:true}},{name:'Ground Zero',cost:24000,desc:'Nuke',effect:{damage:10,explodeRadius:80,moabDmg:20}},{name:'Tsar Bomba',cost:100000,desc:'Tsar Bomba',effect:{damage:25,explodeRadius:120,moabDmg:100,pierce:30}}]},
-      {name:'Spectre',levels:[{name:'Sharper Darts',cost:350,desc:'Pierce',effect:{pierce:4}},{name:'Centered Path',cost:250,desc:'Faster',effect:{fireRateMul:1.3}},{name:'Neva-Miss Targeting',cost:2000,desc:'Homing',effect:{pierce:6,damage:2}},{name:'Spectre',cost:24000,desc:'Gunship',effect:{fireRateMul:2,damage:5,pierce:8,numProjectiles:20}},{name:'Flying Fortress',cost:100000,desc:'Fortress',effect:{fireRateMul:4,damage:15,pierce:30,numProjectiles:30}}]}
-    ]},
-  { id:'heli', name:'Heli Pilot', icon:'🚁', color:'#d35400', cost:1600, category:'MILITARY', desc:'Highly mobile. Follows cursor or locks in place.', range:200, fireRate:1.2, damage:1, projectileSpeed:320, projectileRadius:5, pierce:2, numProjectiles:2,
-    upgrades:[
-      {name:'Quad Darts',levels:[{name:'Quad Darts',cost:700,desc:'4 darts',effect:{numProjectiles:4}},{name:'Pursuit',cost:500,desc:'Faster',effect:{fireRateMul:1.3}},{name:'Razor Rotors',cost:2500,desc:'Rotors',effect:{damage:3,pierce:6}},{name:'Apache Dartship',cost:12000,desc:'Apache',effect:{fireRateMul:2,damage:5,numProjectiles:6}},{name:'Apache Prime',cost:45000,desc:'Prime',effect:{fireRateMul:4,damage:12,numProjectiles:8,pierce:8}}]},
-      {name:'Bigger Jets',levels:[{name:'Bigger Jets',cost:350,desc:'Faster',effect:{fireRateMul:1.2}},{name:'IFR',cost:450,desc:'Camo',effect:{camo:true}},{name:'Downdraft',cost:2000,desc:'Push',effect:{fireRateMul:1.5,damage:2}},{name:'Support Chinook',cost:8000,desc:'Support',effect:{fireRateMul:2,damage:4,roundIncome:200}},{name:'Special Poperations',cost:35000,desc:'Special ops',effect:{fireRateMul:3,damage:10,numProjectiles:6}}]},
-      {name:'Comanche',levels:[{name:'Lots of Guns',cost:500,desc:'Guns',effect:{damage:2}},{name:'MOAB Shove',cost:600,desc:'Push MOABs',effect:{damage:2,moabDmg:2}},{name:'Comanche Defense',cost:6000,desc:'Mini helis',effect:{fireRateMul:2,damage:4}},{name:'Comanche Commander',cost:35000,desc:'Commander',effect:{fireRateMul:3,damage:8,numProjectiles:10}},{name:'Comanche Fortress',cost:70000,desc:'Fortress',effect:{damage:15,pierce:20,fireRateMul:3,numProjectiles:12}}]}
-    ]},
-  { id:'mortar', name:'Mortar Monkey', icon:'🧨', color:'#7f8c8d', cost:750, category:'MILITARY', desc:'Blasts targeted areas. Great for crowded lanes.', range:9999, fireRate:0.5, damage:1, projectileSpeed:250, projectileRadius:8, explodeRadius:40, isExplosive:true, pierce:30,
-    upgrades:[
-      {name:'Bigger Blast',levels:[{name:'Bigger Blast',cost:350,desc:'Bigger',effect:{explodeRadiusMul:1.3}},{name:'Bloon Buster',cost:500,desc:'+dmg',effect:{damage:2,explodeRadiusMul:1.5}},{name:'Shell Shock',cost:1000,desc:'Stun',effect:{stun:1,damage:3}},{name:'The Big One',cost:5000,desc:'Big One',effect:{explodeRadiusMul:2,damage:6,pierce:60}},{name:'The Biggest One',cost:35000,desc:'Biggest',effect:{explodeRadiusMul:3,damage:20,pierce:200}}]},
-      {name:'Rapid Reload',levels:[{name:'Faster Reload',cost:250,desc:'Faster',effect:{fireRateMul:1.33}},{name:'Rapid Reload',cost:300,desc:'Faster',effect:{fireRateMul:1.6}},{name:'Heavy Shells',cost:1000,desc:'Heavy',effect:{damage:3,fireRateMul:1.8}},{name:'Artillery Battery',cost:5000,desc:'Rapid',effect:{fireRateMul:3,damage:4}},{name:'Pop and Awe',cost:35000,desc:'Pop&Awe',effect:{fireRateMul:6,damage:8,explodeRadiusMul:2,stun:2}}]},
-      {name:'Burny Stuff',levels:[{name:'Burny Stuff',cost:300,desc:'Burn',effect:{dot:1,dotInterval:0.5}},{name:'Bloon Buster',cost:500,desc:'Burn',effect:{dot:2,dotInterval:0.4}},{name:'Signal Flare',cost:750,desc:'Camo',effect:{camo:true,dot:2}},{name:'Shattering Shells',cost:4500,desc:'Shatter',effect:{damage:5,dot:4,pierce:50}},{name:'Blooncineration',cost:45000,desc:'Incinerate',effect:{damage:10,dot:8,dotInterval:0.1,explodeRadiusMul:2.5}}]}
-    ]},
-  { id:'dartling', name:'Dartling Gunner', icon:'🔫', color:'#c0392b', cost:850, category:'MILITARY', desc:'Rapid-fire gunner aimed at cursor.', range:9999, fireRate:3.0, damage:1, projectileSpeed:500, projectileRadius:4, pierce:2, aimCursor:true,
-    upgrades:[
-      {name:'Focused Firing',levels:[{name:'Focused Firing',cost:300,desc:'Accurate',effect:{fireRateMul:1.2}},{name:'Laser Cannon',cost:1000,desc:'Laser',effect:{damage:2,pierce:4,lead:true}},{name:'Plasma Accelerator',cost:4500,desc:'Plasma',effect:{damage:3,pierce:8}},{name:'Ray of Doom',cost:45000,desc:'Ray',effect:{damage:8,pierce:999,fireRateMul:2}},{name:'Ray of Doom Prime',cost:200000,desc:'Prime',effect:{damage:25,pierce:999,fireRateMul:4}}]},
-      {name:'Hydra Rockets',levels:[{name:'Faster Barrel Spin',cost:450,desc:'Faster',effect:{fireRateMul:1.4}},{name:'Hydra Rocket Pods',cost:2500,desc:'Rockets',effect:{damage:2,explodeRadius:25,isExplosive:true,pierce:10}},{name:'Rocket Storm',cost:6000,desc:'Barrage',effect:{fireRateMul:2,damage:3,explodeRadius:35}},{name:'M.A.D.',cost:20000,desc:'MAD',effect:{fireRateMul:3,damage:6,moabDmg:20,explodeRadius:40}},{name:'M.A.D. Prime',cost:95000,desc:'Prime',effect:{fireRateMul:5,damage:12,moabDmg:200,explodeRadius:60}}]},
-      {name:'Buckshot',levels:[{name:'Faster Swivel',cost:150,desc:'Faster',effect:{fireRateMul:1.15}},{name:'Powerful Darts',cost:600,desc:'Pierce',effect:{pierce:5}},{name:'Buckshot',cost:1500,desc:'Spread',effect:{numProjectiles:5,damage:2}},{name:'BADS',cost:11000,desc:'Area denial',effect:{numProjectiles:8,damage:4,pierce:10}},{name:'BADS Prime',cost:60000,desc:'Prime',effect:{numProjectiles:12,damage:15,pierce:25,moabDmg:50}}]}
-    ]},
-  // ===== MAGIC =====
-  { id:'wizard', name:'Wizard Monkey', icon:'🧙', color:'#9b59b6', cost:450, category:'MAGIC', desc:'Arcane magic. Fireballs & strips Camo.', range:155, fireRate:0.9, damage:1, projectileSpeed:300, projectileRadius:7, pierce:2,
-    upgrades:[
-      {name:'Fireball',levels:[{name:'Guided Magic',cost:200,desc:'Homing',effect:{pierce:3}},{name:'Fireball',cost:400,desc:'Fireballs',effect:{damage:2,explodeRadius:20,dot:1,dotInterval:0.5}},{name:'Wall of Fire',cost:1300,desc:'Fire wall',effect:{damage:4,dot:3,dotInterval:0.3}},{name:'Dragon\'s Breath',cost:3500,desc:'Dragon',effect:{damage:6,dot:5,dotInterval:0.2,pierce:8}},{name:'Summon Phoenix',cost:30000,desc:'Phoenix',effect:{damage:15,dot:8,dotInterval:0.1,pierce:15}}]},
-      {name:'Arcane Blast',levels:[{name:'Intense Magic',cost:200,desc:'Faster',effect:{fireRateMul:1.3,damage:2}},{name:'Arcane Blast',cost:1100,desc:'Blast',effect:{damage:4,pierce:5}},{name:'Arcane Mastery',cost:4000,desc:'Mastery',effect:{damage:7,pierce:8,fireRateMul:1.5}},{name:'Arcane Spike',cost:12000,desc:'Spike',effect:{damage:25,pierce:20,fireRateMul:2}},{name:'Archmage',cost:32000,desc:'Archmage',effect:{damage:50,pierce:40,fireRateMul:2.5}}]},
-      {name:'Necromancer',levels:[{name:'Monkey Sense',cost:650,desc:'Camo',effect:{camo:true}},{name:'Shimmer',cost:500,desc:'Reveals',effect:{camo:true,rangeMul:1.3}},{name:'Necromancer',cost:5000,desc:'Undead',effect:{damage:3,pierce:6,rangeMul:1.5}},{name:'Prince of Darkness',cost:35000,desc:'Prince',effect:{damage:8,pierce:15,rangeMul:2,fireRateMul:1.5}},{name:'Wizard Lord',cost:120000,desc:'Wizard Lord',effect:{damage:25,pierce:40,rangeMul:2,fireRateMul:3}}]}
-    ]},
-  { id:'super', name:'Super Monkey', icon:'🦸', color:'#f39c12', cost:2500, category:'MAGIC', desc:'Blazing dart speed. Upgrades to Sun God & more.', range:160, fireRate:10.0, damage:1, projectileSpeed:400, projectileRadius:4, pierce:1,
-    upgrades:[
-      {name:'Sun Avatar',levels:[{name:'Laser Blasts',cost:2500,desc:'Lasers',effect:{damage:2,lead:true,pierce:2}},{name:'Plasma Blasts',cost:4000,desc:'Plasma',effect:{damage:4,pierce:3}},{name:'Sun Avatar',cost:20000,desc:'Sun Avatar',effect:{damage:8,pierce:6,fireRateMul:1.5,rangeMul:1.2}},{name:'Sun Temple',cost:100000,desc:'Sun Temple',effect:{damage:20,pierce:15,fireRateMul:2}},{name:'True Sun God',cost:300000,desc:'True Sun God',effect:{damage:60,pierce:40,fireRateMul:3,rangeMul:1.5}}]},
-      {name:'Robo Monkey',levels:[{name:'Super Range',cost:1500,desc:'Range',effect:{rangeMul:1.2}},{name:'Epic Range',cost:2500,desc:'Range',effect:{rangeMul:1.5}},{name:'Robo Monkey',cost:8000,desc:'Robo',effect:{numProjectiles:2,fireRateMul:1.5}},{name:'Tech Terror',cost:15000,desc:'Tech',effect:{damage:5,numProjectiles:3,pierce:5}},{name:'The Anti-Bloon',cost:60000,desc:'Anti-Bloon',effect:{damage:20,numProjectiles:4,pierce:12,rangeMul:1.3}}]},
-      {name:'Dark Knight',levels:[{name:'Knockback',cost:2000,desc:'Push',effect:{damage:2,pierce:2}},{name:'Ultravision',cost:1200,desc:'Camo',effect:{camo:true}},{name:'Dark Knight',cost:5000,desc:'Dark',effect:{damage:4,pierce:4,rangeMul:1.3}},{name:'Dark Champion',cost:50000,desc:'Champion',effect:{damage:12,pierce:10,rangeMul:1.5,fireRateMul:1.5}},{name:'Legend of the Night',cost:200000,desc:'Legend',effect:{damage:40,pierce:30,rangeMul:2,fireRateMul:2,camo:true}}]}
-    ]},
-  { id:'ninja', name:'Ninja Monkey', icon:'🥷', color:'#2c3e50', cost:500, category:'MAGIC', desc:'Fast-tracking shurikens. Sees camo.', range:145, fireRate:1.8, damage:1, projectileSpeed:350, projectileRadius:5, pierce:1, camo:true,
-    upgrades:[
-      {name:'Bloonjitsu',levels:[{name:'Ninja Discipline',cost:200,desc:'Faster',effect:{fireRateMul:1.33}},{name:'Sharp Shurikens',cost:300,desc:'Pierce',effect:{pierce:3}},{name:'Double Shot',cost:1200,desc:'Double',effect:{numProjectiles:2,fireRateMul:1.3}},{name:'Bloonjitsu',cost:3000,desc:'5 shurikens',effect:{numProjectiles:5,fireRateMul:1.5}},{name:'Grandmaster Ninja',cost:24000,desc:'Grandmaster',effect:{numProjectiles:10,fireRateMul:2.5,damage:4}}]},
-      {name:'Flash Bomb',levels:[{name:'Distraction',cost:250,desc:'Knockback',effect:{damage:2}},{name:'Counter-Espionage',cost:400,desc:'Camo',effect:{camo:true,pierce:2}},{name:'Flash Bomb',cost:1200,desc:'Stun',effect:{stun:0.5,damage:2,explodeRadius:25}},{name:'Sticky Bomb',cost:4500,desc:'MOAB bombs',effect:{damage:5,moabDmg:60}},{name:'Master Bomber',cost:30000,desc:'Master',effect:{damage:12,pierce:20,stun:1,explodeRadius:50}}]},
-      {name:'Grand Saboteur',levels:[{name:'Seeking Shuriken',cost:400,desc:'Seek',effect:{pierce:3}},{name:'Caltrops',cost:500,desc:'Caltrops',effect:{pierce:4,damage:2}},{name:'Shinobi Tactics',cost:900,desc:'Buff ninjas',effect:{fireRateMul:1.5,damage:2}},{name:'Bloon Sabotage',cost:6000,desc:'Sabotage',effect:{moabDmg:5,damage:5}},{name:'Grand Saboteur',cost:32000,desc:'Grand',effect:{moabDmg:20,damage:10,pierce:15}}]}
-    ]},
-  { id:'alchemist', name:'Alchemist', icon:'⚗️', color:'#e74c3c', cost:550, category:'MAGIC', desc:'Brews potions to buff monkeys or melt bloons.', range:150, fireRate:0.7, damage:2, projectileSpeed:260, projectileRadius:8, isGlue:true, slowFactor:0.7, slowDuration:2.0, pierce:3,
-    upgrades:[
-      {name:'Berserker Brew',levels:[{name:'Larger Potions',cost:200,desc:'Bigger',effect:{explodeRadius:20,pierce:5}},{name:'Acidic Mixture',cost:300,desc:'Acid',effect:{dot:2,dotInterval:0.5}},{name:'Berserker Brew',cost:1200,desc:'Buff allies',effect:{fireRateMul:1.3,damage:3,buffAllies:true}},{name:'Stronger Stimulant',cost:3500,desc:'Stronger',effect:{fireRateMul:1.6,damage:5,buffAllies:true}},{name:'Permanent Brew',cost:45000,desc:'Permanent',effect:{fireRateMul:2,damage:8,buffAllies:true}}]},
-      {name:'Unstable Concoction',levels:[{name:'Stronger Acid',cost:300,desc:'Acid',effect:{dot:3,dotInterval:0.4}},{name:'Perishing Potions',cost:600,desc:'Explode',effect:{explodeRadius:25,dot:4}},{name:'Unstable Concoction',cost:2500,desc:'Unstable',effect:{damage:4,explodeRadius:40,dot:5}},{name:'Transforming Tonic',cost:7000,desc:'Beast',effect:{damage:8,pierce:10,dot:6}},{name:'Total Transformation',cost:45000,desc:'Total',effect:{damage:20,pierce:25,dot:10,dotInterval:0.1}}]},
-      {name:'Bloon Master',levels:[{name:'Faster Throwing',cost:300,desc:'Faster',effect:{fireRateMul:1.4}},{name:'Acid Pool',cost:400,desc:'Pool',effect:{pierce:8,explodeRadius:15}},{name:'Lead to Gold',cost:1000,desc:'Lead',effect:{lead:true,damage:3}},{name:'Rubber to Gold',cost:3000,desc:'Gold',effect:{lead:true,damage:5,pierce:10,roundIncome:100}},{name:'Bloon Master Alchemist',cost:35000,desc:'Master',effect:{damage:10,pierce:20,lead:true,moabDmg:50}}]}
-    ]},
-  { id:'druid', name:'Druid', icon:'🌿', color:'#27ae60', cost:425, category:'MAGIC', desc:'Nature power: lightning, thorns & storms.', range:150, fireRate:1.1, damage:1, projectileSpeed:300, projectileRadius:6, pierce:2,
-    upgrades:[
-      {name:'Druid of Storm',levels:[{name:'Hard Thorns',cost:200,desc:'Pierce',effect:{pierce:4,damage:2}},{name:'Heart of Thunder',cost:800,desc:'Lightning',effect:{damage:3,pierce:6,dot:1,dotInterval:0.5}},{name:'Druid of the Storm',cost:2500,desc:'Storm',effect:{damage:5,rangeMul:1.4,fireRateMul:1.5}},{name:'Ball Lightning',cost:5000,desc:'Ball',effect:{damage:8,pierce:15,dot:3}},{name:'Superstorm',cost:60000,desc:'Superstorm',effect:{damage:20,pierce:30,dot:8,dotInterval:0.2,rangeMul:1.5}}]},
-      {name:'Druid of the Jungle',levels:[{name:'Thorn Swarm',cost:350,desc:'Thorns',effect:{numProjectiles:4,pierce:5}},{name:'Druid of the Jungle',cost:500,desc:'Vines',effect:{isGlue:true,slowFactor:0.6,slowDuration:2}},{name:'Jungle\'s Bounty',cost:2000,desc:'Cash',effect:{damage:4,roundIncome:150}},{name:'Spirit of the Forest',cost:6000,desc:'Spirit',effect:{damage:7,pierce:12,dot:2}},{name:'Avatar of Wrath',cost:40000,desc:'Wrath',effect:{damage:18,pierce:30,fireRateMul:3,rangeMul:1.8}}]},
-      {name:'Druid of the Plains',levels:[{name:'Druid of the Plains',cost:300,desc:'Camo',effect:{camo:true,damage:2}},{name:'Savage Strikes',cost:500,desc:'Strikes',effect:{damage:3,pierce:4}},{name:'Poplust',cost:2000,desc:'Buff',effect:{damage:5,pierce:8,buffAllies:true}},{name:'Bumbling Brew',cost:6000,desc:'Brew',effect:{damage:7,pierce:12,dot:2}},{name:'Avatar of the Wild',cost:30000,desc:'Wild',effect:{damage:15,pierce:25,dot:6,fireRateMul:2}}]}
-    ]},
-  { id:'mermonkey', name:'Mermonkey', icon:'🧜', color:'#1abc9c', cost:600, category:'MAGIC', desc:'Aquatic magic: water blasts & sonic waves.', range:165, fireRate:1.0, damage:2, projectileSpeed:300, projectileRadius:7, pierce:3,
-    upgrades:[
-      {name:'Sonic Blast',levels:[{name:'Sonic Blast',cost:350,desc:'Shockwave',effect:{damage:3,explodeRadius:25,pierce:5}},{name:'Deep Resonance',cost:600,desc:'Deep',effect:{damage:4,explodeRadius:35,pierce:8}},{name:'Depth Charge',cost:2000,desc:'Charge',effect:{damage:6,explodeRadius:50,pierce:15,moabDmg:5}},{name:'Tidal Surge',cost:6000,desc:'Tidal',effect:{damage:10,explodeRadius:70,pierce:25,moabDmg:12}},{name:'Leviathan',cost:35000,desc:'Leviathan',effect:{damage:25,explodeRadius:100,pierce:60,moabDmg:30}}]},
-      {name:'Aqua Magic',levels:[{name:'Aqua Magic',cost:400,desc:'Camo',effect:{damage:3,pierce:5,camo:true}},{name:'Hydro Blast',cost:700,desc:'Blast',effect:{damage:5,pierce:8,fireRateMul:1.3}},{name:'Whirlpool',cost:2500,desc:'Whirlpool',effect:{damage:7,pierce:12,isGlue:true,slowFactor:0.5,slowDuration:2}},{name:'Maelstrom',cost:7000,desc:'Maelstrom',effect:{damage:12,pierce:20,fireRateMul:1.8,dot:3}},{name:'Poseidon',cost:40000,desc:'Poseidon',effect:{damage:30,pierce:50,fireRateMul:3,dot:8,dotInterval:0.1}}]},
-      {name:'Amphibious',levels:[{name:'Amphibious',cost:250,desc:'Range',effect:{rangeMul:1.2,damage:2}},{name:'Tide Turner',cost:450,desc:'Turn tide',effect:{rangeMul:1.4,damage:3,fireRateMul:1.2}},{name:'Siren Song',cost:1800,desc:'Lure',effect:{rangeMul:1.6,damage:5,isGlue:true,slowFactor:0.4}},{name:'Coral\'s Wrath',cost:5000,desc:'Coral',effect:{rangeMul:1.8,damage:8,pierce:10,dot:4}},{name:'Atlantis',cost:35000,desc:'Atlantis',effect:{rangeMul:2.5,damage:20,pierce:40,camo:true,lead:true,moabDmg:15}}]}
-    ]},
-  // ===== SUPPORT =====
-  { id:'farm', name:'Banana Farm', icon:'🍌', color:'#f1c40f', cost:1250, category:'SUPPORT', desc:'Generates cash every round. Essential economy.', range:0, fireRate:0.01, damage:0, projectileSpeed:1, projectileRadius:1, pierce:0, isFarm:true, roundIncome:80,
-    upgrades:[
-      {name:'Banana Plantation',levels:[{name:'Increased Production',cost:300,desc:'+$120/rnd',effect:{roundIncome:120}},{name:'Greater Production',cost:500,desc:'+$300/rnd',effect:{roundIncome:300}},{name:'Banana Plantation',cost:1500,desc:'+$700/rnd',effect:{roundIncome:700}},{name:'Banana Research',cost:8000,desc:'+$2000/rnd',effect:{roundIncome:2000}},{name:'Banana Central',cost:50000,desc:'+$6000/rnd',effect:{roundIncome:6000}}]},
-      {name:'Monkey Bank',levels:[{name:'Long Life Bananas',cost:400,desc:'+$150/rnd',effect:{roundIncome:150}},{name:'Valuable Bananas',cost:700,desc:'+$450/rnd',effect:{roundIncome:450}},{name:'Monkey Bank',cost:2500,desc:'+$1000/rnd',effect:{roundIncome:1000}},{name:'IMF Loan',cost:6000,desc:'+$2000/rnd',effect:{roundIncome:2000}},{name:'Monkey-Nomics',cost:50000,desc:'+$7000/rnd',effect:{roundIncome:7000}}]},
-      {name:'Marketplace',levels:[{name:'EZ Collect',cost:500,desc:'+$200/rnd',effect:{roundIncome:200}},{name:'Marketplace',cost:3000,desc:'+$800/rnd',effect:{roundIncome:800}},{name:'Central Market',cost:10000,desc:'+$2500/rnd',effect:{roundIncome:2500}},{name:'Monkey Wall Street',cost:30000,desc:'+$6000/rnd',effect:{roundIncome:6000}},{name:'Monkeyopolis',cost:100000,desc:'+$15000/rnd',effect:{roundIncome:15000}}]}
-    ]},
-  { id:'spike', name:'Spike Factory', icon:'🦔', color:'#e67e22', cost:1000, category:'SUPPORT', desc:'Lays spikes at track. Last line of defense.', range:80, fireRate:0.5, damage:1, projectileSpeed:80, projectileRadius:5, pierce:8, isSpike:true,
-    upgrades:[
-      {name:'Bigger Stacks',levels:[{name:'Bigger Stacks',cost:300,desc:'More spikes',effect:{pierce:12}},{name:'White Hot Spikes',cost:350,desc:'Lead',effect:{lead:true,pierce:14}},{name:'Spiked Balls',cost:1000,desc:'Big spikes',effect:{pierce:20,damage:2}},{name:'Spiked Mines',cost:4000,desc:'Mines',effect:{pierce:50,damage:5,explodeRadius:30}},{name:'Super Mines',cost:55000,desc:'Super',effect:{pierce:200,damage:20,explodeRadius:80}}]},
-      {name:'MOAB Shredder',levels:[{name:'Faster Production',cost:200,desc:'Faster',effect:{fireRateMul:1.5}},{name:'Even Faster',cost:300,desc:'Faster',effect:{fireRateMul:2}},{name:'MOAB Shredder',cost:2500,desc:'MOAB',effect:{fireRateMul:3,moabDmg:5,damage:3}},{name:'Spike Storm',cost:5500,desc:'Storm',effect:{fireRateMul:5,pierce:30,damage:5}},{name:'Carpet of Spikes',cost:40000,desc:'Carpet',effect:{fireRateMul:8,pierce:100,damage:10}}]},
-      {name:'Perma-Spike',levels:[{name:'Long Reach',cost:200,desc:'Range',effect:{rangeMul:1.3}},{name:'Long Life Spikes',cost:350,desc:'Coverage',effect:{rangeMul:1.6,pierce:12}},{name:'Perma-Spike',cost:2000,desc:'Permanent',effect:{rangeMul:2,pierce:25}},{name:'Deadly Spikes',cost:4000,desc:'Deadly',effect:{rangeMul:2.2,damage:4,pierce:40}},{name:'Perma-Spike Ultra',cost:30000,desc:'Ultra',effect:{rangeMul:3,damage:8,pierce:80}}]}
-    ]},
-  { id:'village', name:'Monkey Village', icon:'🏘️', color:'#8e44ad', cost:1200, category:'SUPPORT', desc:'Buffs all nearby towers: range, speed, detection.', range:200, fireRate:0.01, damage:0, projectileSpeed:1, projectileRadius:1, pierce:0, isVillage:true,
-    upgrades:[
-      {name:'Bigger Radius',levels:[{name:'Bigger Radius',cost:300,desc:'+range',effect:{rangeMul:1.2}},{name:'Jungle Drums',cost:700,desc:'+speed',effect:{rangeMul:1.3,villageSpeed:1.15}},{name:'Primary Training',cost:800,desc:'Primary buff',effect:{rangeMul:1.4}},{name:'Primary Mentoring',cost:2500,desc:'Mentoring',effect:{rangeMul:1.6,villageSpeed:1.2}},{name:'Primary Expertise',cost:20000,desc:'Expertise',effect:{rangeMul:2,villageSpeed:1.3}}]},
-      {name:'Monkey Intelligence',levels:[{name:'Grow Blocker',cost:600,desc:'Anti-regrow',effect:{rangeMul:1.2}},{name:'Radar Scanner',cost:700,desc:'Camo aura',effect:{camo:true,villageCamo:true,rangeMul:1.3}},{name:'MIB',cost:8000,desc:'Pop all',effect:{lead:true,villageLead:true,rangeMul:1.5}},{name:'Call to Arms',cost:22000,desc:'Speed boost',effect:{villageSpeed:1.5,rangeMul:1.6}},{name:'Homeland Defense',cost:55000,desc:'Defense',effect:{villageSpeed:2,rangeMul:2}}]},
-      {name:'Monkey Economy',levels:[{name:'Monkey Business',cost:500,desc:'Discount',effect:{rangeMul:1.1}},{name:'Monkey Commerce',cost:500,desc:'Cash',effect:{rangeMul:1.2,roundIncome:100}},{name:'Monkey Town',cost:3000,desc:'Cash+',effect:{rangeMul:1.3,roundIncome:300}},{name:'Monkey City',cost:10000,desc:'City',effect:{rangeMul:1.5,roundIncome:800}},{name:'Monkeyopolis',cost:50000,desc:'Opolis',effect:{rangeMul:2,roundIncome:2000}}]}
-    ]},
-  { id:'engineer', name:'Engineer Monkey', icon:'🔧', color:'#e67e22', cost:450, category:'SUPPORT', desc:'Builds sentries & overclocks other towers.', range:140, fireRate:0.9, damage:1, projectileSpeed:310, projectileRadius:5, pierce:1,
-    upgrades:[
-      {name:'Sentry Champion',levels:[{name:'Sentry Gun',cost:700,desc:'Sentries',effect:{damage:2,pierce:2}},{name:'Faster Engineering',cost:400,desc:'Faster',effect:{fireRateMul:1.4}},{name:'Sprockets',cost:350,desc:'Sprockets',effect:{damage:2,pierce:3,fireRateMul:1.5}},{name:'Sentry Expert',cost:2500,desc:'Expert',effect:{damage:4,pierce:5,fireRateMul:2}},{name:'Sentry Champion',cost:23500,desc:'Champion',effect:{damage:8,pierce:12,fireRateMul:3}}]},
-      {name:'Overclock',levels:[{name:'Larger Service Area',cost:200,desc:'Range',effect:{rangeMul:1.2}},{name:'Deconstruction',cost:400,desc:'MOAB',effect:{moabDmg:5,rangeMul:1.3}},{name:'Overclock',cost:7000,desc:'Overclock',effect:{fireRateMul:1.5,rangeMul:1.5,buffAllies:true}},{name:'Ultraboost',cost:32000,desc:'Ultra',effect:{fireRateMul:2,rangeMul:1.8,damage:5,buffAllies:true}},{name:'XXXL Trap',cost:90000,desc:'Trap',effect:{fireRateMul:4,damage:15,pierce:20,rangeMul:2}}]},
-      {name:'Cleansing Foam',levels:[{name:'Faster Nails',cost:200,desc:'Faster',effect:{fireRateMul:1.3}},{name:'Pin',cost:300,desc:'Pin',effect:{numProjectiles:3,pierce:3,stun:0.3}},{name:'Double Gun',cost:1500,desc:'Double',effect:{numProjectiles:5,damage:2,pierce:5}},{name:'Cleansing Foam',cost:2000,desc:'Foam',effect:{dot:3,dotInterval:0.3,pierce:8}},{name:'Bloon Trap',cost:15000,desc:'Trap',effect:{damage:8,pierce:20,dot:4,dotInterval:0.2}}]}
-    ]},
-  { id:'beast', name:'Beast Handler', icon:'🦖', color:'#e74c3c', cost:700, category:'SUPPORT', desc:'Unleashes birds, sharks & dinosaurs.', range:180, fireRate:0.7, damage:3, projectileSpeed:280, projectileRadius:9, pierce:3,
-    upgrades:[
-      {name:'Bird Path',levels:[{name:'Lil\' Sharpnel',cost:350,desc:'Bird',effect:{fireRateMul:1.3,damage:3,pierce:4}},{name:'Soaring Eagle',cost:600,desc:'Eagle',effect:{fireRateMul:1.5,damage:5,pierce:6}},{name:'Condor',cost:2000,desc:'Condor',effect:{fireRateMul:2,damage:8,pierce:10}},{name:'Giant Condor',cost:7000,desc:'Giant',effect:{fireRateMul:2.5,damage:12,pierce:18}},{name:'Pouakai',cost:30000,desc:'Pouakai',effect:{fireRateMul:4,damage:25,pierce:40,camo:true}}]},
-      {name:'Shark Path',levels:[{name:'Piranha',cost:400,desc:'Piranha',effect:{damage:4,pierce:5}},{name:'Barracuda',cost:700,desc:'Barracuda',effect:{damage:6,pierce:8,fireRateMul:1.4}},{name:'Great White',cost:2500,desc:'Great White',effect:{damage:10,pierce:14,fireRateMul:1.8}},{name:'Orca',cost:8000,desc:'Orca',effect:{damage:15,pierce:25,fireRateMul:2.2}},{name:'Megalodon',cost:35000,desc:'Megalodon',effect:{damage:40,pierce:60,fireRateMul:3,moabDmg:8}}]},
-      {name:'Dino Path',levels:[{name:'Microraptor',cost:350,desc:'Raptor',effect:{damage:4,pierce:5}},{name:'Velociraptor',cost:650,desc:'Velociraptor',effect:{damage:6,pierce:8,fireRateMul:1.5}},{name:'Triceratops',cost:2200,desc:'Triceratops',effect:{damage:9,pierce:12,fireRateMul:1.8}},{name:'T-Rex',cost:8500,desc:'T-Rex',effect:{damage:18,pierce:28,fireRateMul:2,rangeMul:1.3}},{name:'Apex Predator',cost:40000,desc:'Apex',effect:{damage:45,pierce:75,fireRateMul:3.5,camo:true,moabDmg:10}}]}
-    ]},
-];
-
-// ---------- ENEMIES (BLOONS) ----------
-const ENEMY_TYPES = {
-  red:    { name:'Red',    color:'#e74c3c', hp:1,   speed:60,  radius:8,  cash:1,  spawnOn:null },
-  blue:   { name:'Blue',   color:'#3498db', hp:2,   speed:80,  radius:8,  cash:2,  spawnOn:'red'   },
-  green:  { name:'Green',  color:'#27ae60', hp:3,   speed:100, radius:8,  cash:3,  spawnOn:'blue'  },
-  yellow: { name:'Yellow', color:'#f1c40f', hp:4,   speed:140, radius:8,  cash:4,  spawnOn:'green' },
-  pink:   { name:'Pink',   color:'#e91e63', hp:5,   speed:170, radius:8,  cash:5,  spawnOn:'yellow'},
-  white:  { name:'White',  color:'#ecf0f1', hp:11,  speed:110, radius:9,  cash:8,  spawnOn:'pink', outline:'#aaa'  },
-  black:  { name:'Black',  color:'#2c3e50', hp:11,  speed:110, radius:9,  cash:8,  spawnOn:'pink'  },
-  purple: { name:'Purple', color:'#8e44ad', hp:11,  speed:100, radius:9,  cash:9,  spawnOn:'pink', isPurple:true },
-  lead:   { name:'Lead',   color:'#7f8c8d', hp:23,  speed:60,  radius:10, cash:23, spawnOn:'black', isLead:true },
-  zebra:  { name:'Zebra',  color:'#8e44ad', hp:23,  speed:90,  radius:10, cash:23, spawnOn:'white', stripColor:'#fff' },
-  rainbow:{ name:'Rainbow',color:'#e74c3c', hp:47,  speed:110, radius:11, cash:47, spawnOn:'zebra', isRainbow:true },
-  ceramic:{ name:'Ceramic',color:'#d35400', hp:200, speed:55,  radius:11, cash:100, spawnOn:'rainbow', isCeramic:true },
-  moab:   { name:'MOAB',   color:'#2980b9', hp:600, speed:25,  radius:28, cash:381, spawnOn:'ceramic', isMoab:true, numSpawn:4 },
-  bfb:    { name:'BFB',    color:'#e74c3c', hp:3000,speed:12,  radius:42, cash:1000, spawnOn:'moab', isMoab:true, numSpawn:4 },
-  zomg:   { name:'ZOMG',   color:'#8e44ad', hp:20000,speed:8,  radius:56, cash:4000, spawnOn:'bfb', isMoab:true, numSpawn:4 },
-  ddt:    { name:'DDT',    color:'#1a1a1a', hp:8000, speed:60, radius:34, cash:2500, spawnOn:'ceramic', isMoab:true, camo:true, isLead:true, numSpawn:4, outline:'#e74c3c' },
-  bad:    { name:'BAD',    color:'#c0392b', hp:65000,speed:6,  radius:64, cash:10000, spawnOn:'zomg', isMoab:true, numSpawn:3 },
-};
-
-// order for sandbox spawn buttons
-const BLOON_ORDER = ['red','blue','green','yellow','pink','white','black','purple','lead','zebra','rainbow','ceramic','moab','bfb','ddt','zomg','bad'];
-
-// ---------- WAVE COMPOSITION ----------
-function getWaveComposition(round) {
-  const base = [];
-  const add = (type, n) => { for (let i=0;i<Math.floor(n);i++) base.push(type); };
-  if (round <= 5) { add('red', round*10+5); }
-  else if (round <= 10) { add('red',15); add('blue',(round-4)*5); }
-  else if (round <= 20) { add('blue',10); add('green',(round-8)*6); if(round>15) add('yellow',(round-15)*3); }
-  else if (round <= 30) { add('green',20); add('yellow',(round-18)*5); add('pink',(round-22)*2); if(round>26) add('white',(round-26)*2); if(round>28) add('black',(round-28)*2); }
-  else if (round <= 40) { add('yellow',20); add('pink',(round-28)*5); add('white',(round-32)*3); add('black',(round-33)*3); if(round>36) add('purple',(round-36)*2); if(round>38) add('lead',(round-38)*2); }
-  else if (round <= 50) { add('pink',15); add('white',(round-38)*2); add('black',(round-38)*2); add('lead',(round-40)*2); add('zebra',(round-42)*2); if(round>46) add('rainbow',(round-46)*2); if(round===50) base.push('moab'); }
-  else if (round <= 60) { add('black',10); add('zebra',(round-48)*3); add('lead',(round-48)*2); add('rainbow',(round-50)*2); if(round>54) add('ceramic',(round-54)*1); if(round>=58) add('moab',(round-57)); if(round===60){ base.push('bfb'); } }
-  else if (round <= 80) { add('zebra',5); add('rainbow',(round-58)*3); add('ceramic',(round-58)*2); add('moab',(round-60)*0.6); if(round>70) add('ddt',(round-70)*0.4); if(round>=75) add('bfb',(round-74)*0.3); }
-  else if (round <= 100) { add('ceramic',(round-78)*4); add('moab',(round-78)); add('ddt',(round-80)*0.5); add('bfb',(round-82)*0.4); if(round>=92) add('zomg',(round-91)*0.3); if(round===100){ base.push('zomg'); base.push('bfb'); } }
-  else { add('ceramic',(round-98)*3); add('moab',(round-98)); add('bfb',(round-98)*0.5); add('zomg',(round-100)*0.3); add('ddt',(round-100)*0.4); if(round>=120) add('bad',(round-119)*0.15); }
-  // shuffle
-  for (let i=base.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [base[i],base[j]]=[base[j],base[i]]; }
-  return base;
+function loadProfile() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (raw) profile = Object.assign(profile, JSON.parse(raw));
+  } catch(e) {}
+  if (!profile.upgrades) profile.upgrades = {};
+  refreshMenuMM();
+}
+function saveProfile() {
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify(profile)); } catch(e) {}
+  refreshMenuMM();
+}
+function refreshMenuMM() {
+  const el = document.getElementById('menu-mm');
+  if (el) el.textContent = Math.floor(profile.monkeyMoney).toLocaleString();
+}
+function upLevel(id) { return profile.upgrades[id] || 0; }
+function upValue(id) {
+  const def = SHOP_UPGRADES.find(u => u.id === id);
+  return def ? upLevel(id) * def.per : 0;
 }
 
-function getIncomeMultiplier(round) {
-  if (round <= 40) return 1.0;
-  if (round <= 60) return 0.7;
-  if (round <= 80) return 0.4;
-  if (round <= 100) return 0.2;
-  return 0.1;
+// ---------- GAME STATE ----------
+let G = null;
+let PATH_POINTS = [];
+let OBSTACLES = [];
+let canvasW = 0, canvasH = 0;
+let animFrameId = null;
+let lastTime = 0;
+let nextId = 1;
+const uid = () => nextId++;
+
+let pendingDifficulty = 'normal';
+let pendingMap = 'monkey_meadow';
+let pendingHero = null;
+
+// ---------- PATH HELPERS ----------
+function buildPath(mapKey, w, h) {
+  const map = MAPS[mapKey];
+  return map.path.map(p => ({x: p[0]*w, y: p[1]*h}));
+}
+function buildObstacles(mapKey, w, h) {
+  const map = MAPS[mapKey];
+  return (map.obstacles||[]).map(o => ({x:o.x*w, y:o.y*h, r:o.r*Math.min(w,h), type:o.type}));
+}
+function getTotalPathLen(pts) {
+  let len = 0;
+  for (let i=0;i<pts.length-1;i++){ const dx=pts[i+1].x-pts[i].x, dy=pts[i+1].y-pts[i].y; len+=Math.sqrt(dx*dx+dy*dy); }
+  return len;
+}
+function getPathPos(t, pts) {
+  const segs = [];
+  for (let i=0;i<pts.length-1;i++){ const dx=pts[i+1].x-pts[i].x, dy=pts[i+1].y-pts[i].y; segs.push(Math.sqrt(dx*dx+dy*dy)); }
+  const total = segs.reduce((a,b)=>a+b,0);
+  let dist = t*total;
+  for (let i=0;i<segs.length;i++){
+    if (dist<=segs[i]){ const f=dist/segs[i]; return {x:pts[i].x+f*(pts[i+1].x-pts[i].x), y:pts[i].y+f*(pts[i+1].y-pts[i].y)}; }
+    dist-=segs[i];
+  }
+  const last = pts[pts.length-1];
+  return {x:last.x, y:last.y};
+}
+
+// 3D Line-of-sight: does the segment from (x1,y1)->(x2,y2) pass through an obstacle?
+function lineBlocked(x1,y1,x2,y2) {
+  for (const o of OBSTACLES) {
+    // distance from circle center to segment
+    const dx = x2-x1, dy = y2-y1;
+    const len2 = dx*dx+dy*dy;
+    let t = len2 === 0 ? 0 : ((o.x-x1)*dx + (o.y-y1)*dy)/len2;
+    t = Math.max(0, Math.min(1, t));
+    const px = x1+t*dx, py = y1+t*dy;
+    const ddx = o.x-px, ddy = o.y-py;
+    if (ddx*ddx+ddy*ddy < o.r*o.r) return true;
+  }
+  return false;
+}
+
+// ---------- SCREEN NAV ----------
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function goToDifficulty() {
+  buildDifficultyGrid();
+  showScreen('difficulty-screen');
+}
+
+function buildDifficultyGrid() {
+  const grid = document.getElementById('difficulty-grid');
+  grid.innerHTML = '';
+  ['easy','normal','hard','impossible'].forEach(key => {
+    const d = DIFFICULTIES[key];
+    const card = document.createElement('div');
+    card.className = 'sel-card';
+    card.innerHTML = `
+      <div class="difficulty-badge" style="background:${d.color};color:#000;">${d.name.toUpperCase()}</div>
+      <span class="sel-icon" style="margin-top:1rem;">${key==='easy'?'🟢':key==='normal'?'🔵':key==='hard'?'🟠':'🔴'}</span>
+      <h3>${d.name}</h3>
+      <p>${d.desc}</p>
+      <p style="margin-top:0.4rem;color:${d.color};">Reward x${d.reward}</p>`;
+    card.onclick = () => { pendingDifficulty = key; buildMapGrid(false); showScreen('map-screen'); };
+    grid.appendChild(card);
+  });
+}
+
+function buildMapGrid(sandbox) {
+  const grid = document.getElementById(sandbox ? 'sandbox-map-grid' : 'map-grid');
+  grid.innerHTML = '';
+  Object.keys(MAPS).forEach(key => {
+    const m = MAPS[key];
+    const card = document.createElement('div');
+    card.className = 'sel-card';
+    card.innerHTML = `
+      <canvas class="map-preview" width="200" height="90" id="prev-${sandbox?'sb-':''}${key}"></canvas>
+      <h3>${m.name}</h3>
+      <p>${m.difficulty}${m.obstacles.length? ' · '+m.obstacles.length+' obstacle(s)':''}</p>`;
+    card.onclick = () => {
+      pendingMap = key;
+      if (sandbox) { pendingDifficulty='sandbox'; pendingHero=null; startGame(); }
+      else { buildHeroGrid(); showScreen('hero-screen'); }
+    };
+    grid.appendChild(card);
+    setTimeout(()=>drawMapPreview(`prev-${sandbox?'sb-':''}${key}`, m), 0);
+  });
+}
+
+function drawMapPreview(canvasId, m) {
+  const c = document.getElementById(canvasId);
+  if (!c) return;
+  const ctx = c.getContext('2d');
+  ctx.fillStyle = m.bg; ctx.fillRect(0,0,c.width,c.height);
+  ctx.strokeStyle = m.pathColor; ctx.lineWidth = 8; ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.beginPath();
+  m.path.forEach((p,i)=>{ const x=p[0]*c.width, y=p[1]*c.height; i?ctx.lineTo(x,y):ctx.moveTo(x,y); });
+  ctx.stroke();
+  (m.obstacles||[]).forEach(o=>{
+    ctx.fillStyle = o.type==='tree'?'#1e5631':o.type==='log'?'#5a3a20':'#555';
+    ctx.beginPath(); ctx.arc(o.x*c.width, o.y*c.height, o.r*Math.min(c.width,c.height), 0, Math.PI*2); ctx.fill();
+  });
+}
+
+let selectedHeroId = null;
+function buildHeroGrid() {
+  const grid = document.getElementById('hero-grid');
+  grid.innerHTML = '';
+  selectedHeroId = null;
+  // "No hero" option
+  const noneCard = document.createElement('div');
+  noneCard.className = 'sel-card';
+  noneCard.innerHTML = `<span class="sel-icon">🚫</span><h3>No Hero</h3><p>Play without a hero this game.</p>`;
+  noneCard.onclick = () => selectHeroCard(null, noneCard);
+  grid.appendChild(noneCard);
+
+  HERO_DEFS.forEach(h => {
+    const card = document.createElement('div');
+    card.className = 'sel-card';
+    card.innerHTML = `
+      <div class="price-tag">$${h.cost}</div>
+      <span class="sel-icon" style="color:${h.color};">${h.icon}</span>
+      <h3 style="color:${h.color};">${h.name}</h3>
+      <p>${h.desc}</p>
+      <p style="margin-top:0.3rem;color:var(--hero);font-size:0.66rem;">✦ ${h.special}</p>`;
+    card.onclick = () => selectHeroCard(h.id, card);
+    grid.appendChild(card);
+  });
+}
+function selectHeroCard(id, card) {
+  document.querySelectorAll('#hero-grid .sel-card').forEach(c=>c.classList.remove('selected'));
+  card.classList.add('selected');
+  selectedHeroId = id;
+}
+function confirmHeroAndStart() {
+  pendingHero = selectedHeroId;
+  startGame();
+}
+
+// ---------- START / QUIT ----------
+function createGameState() {
+  const d = DIFFICULTIES[pendingDifficulty];
+  const startCash = d.cash + (pendingDifficulty==='sandbox'?0:upValue('startCash'));
+  const startLives = d.lives + (pendingDifficulty==='sandbox'?0:upValue('startLives'));
+  return {
+    difficulty: pendingDifficulty, diff: d,
+    mapKey: pendingMap,
+    heroId: pendingHero,
+    heroPlaced: false,
+    round: 1, lives: startLives, cash: startCash,
+    towers: [], enemies: [], projectiles: [], visuals: [],
+    spawnQueue: [], spawnTimer: 0, spawnInterval: 0.35,
+    waveActive: false, waveComplete: false, gameOver: false, won: false,
+    speed: 1, selectedTower: null, placingTower: null,
+    totalKills: 0, cashEarned: 0,
+    autostart: false,
+    sandbox: pendingDifficulty === 'sandbox',
+    aceAngle: 0,
+    mmEarnedThis: 0,
+  };
+}
+
+function startGame() {
+  G = createGameState();
+  showScreen('game-screen');
+  initCanvas();
+  buildShop();
+  document.getElementById('hud-mode').textContent = G.diff.name.toUpperCase();
+  document.getElementById('hud-mode').style.color = G.diff.color;
+  document.getElementById('sandbox-toggle-btn').style.display = G.sandbox ? 'inline-block' : 'none';
+  if (G.sandbox) buildSandboxButtons();
+  document.getElementById('gameover-overlay').classList.remove('show');
+  updateHUD();
+  lastTime = performance.now();
+  if (animFrameId) cancelAnimationFrame(animFrameId);
+  loop();
+}
+
+function quitGame() {
+  if (animFrameId) { cancelAnimationFrame(animFrameId); animFrameId = null; }
+  G = null;
+  document.getElementById('sandbox-panel').classList.remove('show');
+  showScreen('menu-screen');
+}
+
+function initCanvas() {
+  const canvas = document.getElementById('game-canvas');
+  const wrap = document.getElementById('canvas-wrap');
+  canvas.width = wrap.clientWidth;
+  canvas.height = wrap.clientHeight;
+  canvasW = canvas.width; canvasH = canvas.height;
+  PATH_POINTS = buildPath(G.mapKey, canvasW, canvasH);
+  OBSTACLES = buildObstacles(G.mapKey, canvasW, canvasH);
+  if (!canvas._bound) {
+    canvas.addEventListener('click', onCanvasClick);
+    canvas.addEventListener('mousemove', onCanvasMouseMove);
+    canvas.addEventListener('contextmenu', e => { e.preventDefault(); if (G) { G.placingTower=null; deselectTower(); } });
+    canvas._bound = true;
+  }
+}
+
+// ---------- TOWERS ----------
+function getAllDefs() { return TOWER_DEFS; }
+function getDefById(id) {
+  return TOWER_DEFS.find(d=>d.id===id) || HERO_DEFS.find(h=>h.id===id);
+}
+
+function towerCost(def) {
+  if (def.hero) return def.cost;
+  const disc = G.sandbox ? 0 : upValue('discount');
+  return Math.round(def.cost * (1 - disc));
+}
+
+function createTower(def, x, y, isHero=false) {
+  const t = {
+    id: uid(), defId: def.id, def, x, y, isHero,
+    upgradeLevels: [0,0,0],
+    totalCost: isHero ? def.cost : towerCost(def),
+    fireTimer: 0, target: null, targeting: 'first',
+    heroLevel: isHero ? 1 : 0, heroXP: 0, heroAbilityCd: 0,
+    sacBonus: 0, // adora
+  };
+  recomputeTowerStats(t);
+  return t;
+}
+
+function recomputeTowerStats(t) {
+  const def = t.def;
+  t.range = def.range; t.fireRate = def.fireRate; t.damage = def.damage;
+  t.pierce = def.pierce||1; t.numProjectiles = def.numProjectiles||1;
+  t.explodeRadius = def.explodeRadius||0; t.freezeRadius = def.freezeRadius||def.range;
+  t.freezeDuration = def.freezeDuration||0; t.slowDuration = def.slowDuration||0;
+  t.slowFactor = def.slowFactor||1; t.camo = def.camo||false; t.lead = def.lead||false;
+  t.moabDamage = def.moabDamage||1; t.dot = def.dot||0; t.dotInterval = def.dotInterval||1;
+  t.roundIncome = def.roundIncome||0; t.buffAllies = def.buffAllies||false;
+  t.isExplosive = def.isExplosive||false; t.isFreeze = def.isFreeze||false;
+  t.isGlue = def.isGlue||false; t.isFarm = def.isFarm||false; t.isVillage = def.isVillage||false;
+  t.isSpike = def.isSpike||false; t.multiTarget = def.multiTarget||false;
+  t.stun = 0;
+  t.villageSpeed = 1; t.villageCamo=false; t.villageLead=false;
+  t.projectileSpeed = def.projectileSpeed; t.projectileRadius = def.projectileRadius;
+
+  let rangeMul=1, frMul=1, expMul=1, fRadMul=1, fDurMul=1, slowDurMul=1;
+
+  if (!t.isHero && def.upgrades) {
+    for (let pi=0; pi<def.upgrades.length; pi++) {
+      const lv = t.upgradeLevels[pi];
+      for (let li=0; li<lv; li++) {
+        const e = def.upgrades[pi].levels[li].effect;
+        if (e.pierce!==undefined) t.pierce = e.pierce;
+        if (e.damage!==undefined) t.damage = e.damage;
+        if (e.rangeMul!==undefined) rangeMul*=e.rangeMul;
+        if (e.fireRateMul!==undefined) frMul*=e.fireRateMul;
+        if (e.numProjectiles!==undefined) t.numProjectiles = e.numProjectiles;
+        if (e.explodeRadiusMul!==undefined) expMul*=e.explodeRadiusMul;
+        if (e.freezeRadiusMul!==undefined) fRadMul*=e.freezeRadiusMul;
+        if (e.freezeDurationMul!==undefined) fDurMul*=e.freezeDurationMul;
+        if (e.slowDurationMul!==undefined) slowDurMul*=e.slowDurationMul;
+        if (e.camo) t.camo=true;
+        if (e.lead) t.lead=true;
+        if (e.moabDmg!==undefined) t.moabDamage=e.moabDmg;
+        if (e.slowFactor!==undefined) t.slowFactor=e.slowFactor;
+        if (e.dot!==undefined) t.dot=e.dot;
+        if (e.dotInterval!==undefined) t.dotInterval=e.dotInterval;
+        if (e.explodeRadius!==undefined) { t.explodeRadius=e.explodeRadius; t.isExplosive=true; }
+        if (e.roundIncome!==undefined) t.roundIncome=e.roundIncome;
+        if (e.buffAllies) t.buffAllies=true;
+        if (e.stun!==undefined) t.stun=e.stun;
+        if (e.isGlue) t.isGlue=true;
+        if (e.villageSpeed!==undefined) t.villageSpeed=e.villageSpeed;
+        if (e.villageCamo) t.villageCamo=true;
+        if (e.villageLead) t.villageLead=true;
+        if (e.slowDuration!==undefined) t.slowDuration=e.slowDuration;
+      }
+    }
+  }
+
+  // Hero level scaling
+  if (t.isHero) {
+    const L = t.heroLevel;
+    frMul *= (1 + (L-1)*0.05);
+    t.damage = def.damage + Math.floor((L-1)/3);
+    t.pierce = (def.pierce||1) + Math.floor((L-1)/2);
+    rangeMul *= (1 + (L-1)*0.02);
+    t.roundIncome = (def.roundIncome||0) * (1 + (L-1)*0.4);
+    if (def.heroKind==='quincy' && L>=3) t.camo=true;
+    if (def.heroKind==='gwendolin' && L>=5) t.lead=true;
+    if (def.heroKind==='ezili') { t.lead=true; }
+    if (def.heroKind==='adora') { t.damage += t.sacBonus; }
+    if (def.heroKind==='etienne' && L>=def.globalCamoLvl) t.camo=true;
+  }
+
+  // Global permanent upgrades
+  if (!t.isHero || true) {
+    const gDmg = G && !G.sandbox ? upValue('towerDmg') : 0;
+    const gSpd = G && !G.sandbox ? upValue('towerSpeed') : 0;
+    t.damage = Math.max(t.damage, 0) * (1 + gDmg);
+    frMul *= (1 + gSpd);
+  }
+
+  t.range = def.range * rangeMul;
+  t.fireRate = def.fireRate * frMul;
+  t.explodeRadius = (def.explodeRadius||t.explodeRadius||30) * expMul;
+  t.freezeRadius = (def.freezeRadius||def.range) * fRadMul;
+  t.freezeDuration = (def.freezeDuration||0) * fDurMul;
+  t.slowDuration = (def.slowDuration||t.slowDuration||0) * slowDurMul;
+}
+
+// Apply village + alchemist buffs each frame (recompute buff layer)
+function applyBuffs() {
+  // reset buff multipliers
+  for (const t of G.towers) { t._buffSpd = 1; t._buffCamo = false; t._buffLead=false; t._buffRange=1; t._buffDmg=0; }
+  for (const src of G.towers) {
+    if (src.isVillage) {
+      for (const t of G.towers) {
+        if (t === src) continue;
+        const dx=t.x-src.x, dy=t.y-src.y;
+        if (Math.sqrt(dx*dx+dy*dy) <= src.range) {
+          t._buffSpd = Math.max(t._buffSpd, src.villageSpeed);
+          if (src.villageCamo) t._buffCamo = true;
+          if (src.villageLead) t._buffLead = true;
+        }
+      }
+    }
+    if (src.buffAllies) {
+      for (const t of G.towers) {
+        if (t === src) continue;
+        const dx=t.x-src.x, dy=t.y-src.y;
+        if (Math.sqrt(dx*dx+dy*dy) <= (src.range||150)) {
+          t._buffSpd = Math.max(t._buffSpd, 1.3);
+          t._buffDmg = Math.max(t._buffDmg, 1);
+        }
+      }
+    }
+    // Obyn buffs magic towers globally
+    if (src.isHero && src.def.heroKind==='obyn') {
+      for (const t of G.towers) {
+        if (t.def.category === 'MAGIC') { t._buffRange = Math.max(t._buffRange, 1.15); t._buffDmg = Math.max(t._buffDmg, 1); }
+      }
+    }
+    // Etienne global camo at level threshold
+    if (src.isHero && src.def.heroKind==='etienne' && src.heroLevel>=src.def.globalCamoLvl) {
+      for (const t of G.towers) t._buffCamo = true;
+    }
+  }
+}
+
+// ---------- CASH ----------
+function spendCash(amt) { G.cash -= amt; updateHUD(); }
+function gainCash(raw) {
+  if (G.sandbox) { addFloat(0,0,'',''); return raw; }
+  const mult = getIncomeMultiplier(G.round) * G.diff.cashMul;
+  const earned = Math.max(1, Math.round(raw * mult));
+  G.cash += earned; G.cashEarned += earned;
+  updateHUD();
+  return earned;
+}
+
+// ---------- ENEMIES ----------
+let enemyIdCounter = 1;
+function spawnEnemy(type, t=0) {
+  const def = ENEMY_TYPES[type];
+  if (!def) return;
+  const pos = getPathPos(t, PATH_POINTS);
+  const hpMul = G.sandbox ? 1 : G.diff.hpMul;
+  const spMul = G.sandbox ? 1 : G.diff.speedMul;
+  G.enemies.push({
+    id: enemyIdCounter++, type, def,
+    hp: def.hp*hpMul, maxHp: def.hp*hpMul,
+    x: pos.x, y: pos.y, t,
+    speed: def.speed*spMul, radius: def.radius,
+    frozen:0, slowed:0, slowFactor:1, stun:0,
+    dot:0, dotTimer:0, dotInterval:1,
+  });
+}
+
+function startWave() {
+  if (!G || G.waveActive || G.gameOver) return;
+  doStartWave();
+}
+function doStartWave() {
+  G.waveActive = true; G.waveComplete = false;
+  document.getElementById('start-wave-btn').disabled = true;
+  document.getElementById('hud-wave-status').textContent = 'ACTIVE';
+  G.spawnQueue = getWaveComposition(G.round);
+  G.spawnTimer = 0;
+  G.spawnInterval = Math.max(0.12, 0.4 - G.round*0.002);
+}
+
+function updateWave(dt) {
+  if (!G.waveActive) return;
+  G.spawnTimer -= dt;
+  if (G.spawnTimer<=0 && G.spawnQueue.length>0) {
+    spawnEnemy(G.spawnQueue.shift());
+    G.spawnTimer = G.spawnInterval;
+  }
+  if (G.spawnQueue.length===0 && G.enemies.length===0 && !G.waveComplete) endWave();
+}
+
+function endWave() {
+  G.waveComplete = true; G.waveActive = false;
+
+  // Round bonus + farm/income towers
+  const bonus = 100 + G.round;
+  if (!G.sandbox) {
+    const incBoost = 1 + upValue('income');
+    G.cash += Math.round(bonus * G.diff.cashMul * incBoost);
+    // tower round income (farms, banks, etc.)
+    for (const t of G.towers) {
+      if (t.roundIncome > 0) { G.cash += Math.round(t.roundIncome * incBoost); }
+      if (t.isHero && t.def.heroKind==='benjamin') { G.lives += (t.def.extraLives||1); }
+    }
+  }
+
+  const prevRound = G.round;
+  G.round++;
+  updateHUD();
+
+  // Win condition
+  if (!G.sandbox && prevRound >= G.diff.endRound) { triggerWin(); return; }
+
+  document.getElementById('start-wave-btn').disabled = false;
+  document.getElementById('hud-wave-status').textContent = 'WAITING';
+  const msg = document.getElementById('wave-msg');
+  msg.textContent = `ROUND ${prevRound} CLEAR! +$${bonus}`;
+  msg.style.color = ''; msg.classList.add('show');
+  setTimeout(()=>msg.classList.remove('show'), 1400);
+
+  if (G.autostart && !G.gameOver) setTimeout(()=>{ if (G && !G.waveActive && !G.gameOver) doStartWave(); }, 600);
+}
+
+function updateEnemies(dt) {
+  const pathLen = getTotalPathLen(PATH_POINTS);
+  const remove = [];
+  for (const e of G.enemies) {
+    if (e.stun>0) { e.stun-=dt; continue; }
+    if (e.frozen>0) { e.frozen-=dt; if (e.frozen<0) e.frozen=0; continue; }
+    const sf = e.slowed>0 ? e.slowFactor : 1;
+    if (e.slowed>0) e.slowed-=dt;
+    if (e.dot>0) {
+      e.dotTimer-=dt;
+      if (e.dotTimer<=0) { e.hp-=e.dot; e.dotTimer=e.dotInterval||1; if (e.hp<=0){ killEnemy(e); remove.push(e); continue; } }
+    }
+    e.t += (e.speed*sf*dt)/pathLen;
+    if (e.t>=1) {
+      G.lives -= Math.ceil(e.def.hp/5) * (e.def.isMoab?2:1);
+      remove.push(e);
+      if (G.lives<=0 && !G.gameOver) triggerGameOver();
+    } else {
+      const pos = getPathPos(e.t, PATH_POINTS);
+      e.x=pos.x; e.y=pos.y;
+    }
+  }
+  if (remove.length) G.enemies = G.enemies.filter(e=>!remove.includes(e));
+  updateHUD();
+}
+
+function killEnemy(enemy, award=true) {
+  if (enemy._dead) return;
+  enemy._dead = true;
+  G.enemies = G.enemies.filter(e=>e!==enemy);
+  const def = enemy.def;
+  if (def.spawnOn) {
+    const num = def.numSpawn||1;
+    for (let i=0;i<num;i++){ const off=(i-(num-1)/2)*0.003; spawnEnemy(def.spawnOn, Math.max(0, enemy.t+off)); }
+  }
+  if (award && !G.sandbox) {
+    const earned = gainCash(def.cash);
+    addFloat(enemy.x, enemy.y, '+$'+earned, '#ffd700');
+  }
+  G.totalKills++;
+}
+
+// ---------- TARGETING ----------
+function pickTarget(tower, list) {
+  if (list.length===0) return null;
+  switch(tower.targeting) {
+    case 'last': return list.reduce((a,b)=>a.t<b.t?a:b);
+    case 'strong': return list.reduce((a,b)=>a.hp>b.hp?a:b);
+    case 'close': {
+      let best=list[0], bd=Infinity;
+      for (const e of list){ const dx=e.x-tower.x,dy=e.y-tower.y,d=dx*dx+dy*dy; if(d<bd){bd=d;best=e;} }
+      return best;
+    }
+    default: return list.reduce((a,b)=>a.t>b.t?a:b); // first
+  }
+}
+
+function canHit(tower, e) {
+  const camoOK = tower.camo || tower._buffCamo || !e.def.camo;
+  if (!camoOK) return false;
+  const leadOK = tower.lead || tower._buffLead || tower.isExplosive || !e.def.isLead;
+  if (!leadOK) return false;
+  // purple immune to magic/energy unless special (simplified: alchemist/druid/wizard can't unless lead)
+  if (e.def.isPurple && tower.def && tower.def.category==='MAGIC' && !tower.lead) return false;
+  return true;
+}
+
+function updateTowers(dt) {
+  applyBuffs();
+  for (const tower of G.towers) {
+    const spdMul = (tower._buffSpd||1) * (tower.villageSpeed>1?1:1);
+    tower.fireTimer -= dt * spdMul;
+    if (tower.heroAbilityCd>0) tower.heroAbilityCd -= dt;
+    if (tower.isFarm || tower.isVillage) continue;
+    if (tower.fireTimer>0) continue;
+
+    const effRange = tower.range * (tower._buffRange||1);
+
+    // Freeze tower
+    if (tower.isFreeze) {
+      let froze=false;
+      for (const e of G.enemies) {
+        const dx=e.x-tower.x, dy=e.y-tower.y;
+        if (Math.sqrt(dx*dx+dy*dy)<=tower.freezeRadius && canHit(tower,e) && !e.def.isMoab) {
+          e.frozen=tower.freezeDuration; froze=true;
+          if (tower.damage>0) e.hp-=tower.damage;
+        }
+      }
+      if (froze){ tower.fireTimer=1/tower.fireRate; addFloat(tower.x,tower.y-20,'❄','#5dade2'); }
+      continue;
+    }
+
+    // Hero melee (Sauda) - instant slash all in range
+    if (tower.isHero && tower.def.melee) {
+      const inRange = G.enemies.filter(e => {
+        const dx=e.x-tower.x,dy=e.y-tower.y; return Math.sqrt(dx*dx+dy*dy)<=effRange && canHit(tower,e);
+      });
+      if (inRange.length) {
+        tower.fireTimer = 1/tower.fireRate;
+        let cnt=0;
+        for (const e of inRange) {
+          if (cnt++ >= tower.pierce) break;
+          e.hp -= dmgTo(tower,e);
+          G.visuals.push({type:'slash', x:e.x, y:e.y, life:0.15});
+          if (e.hp<=0) killEnemy(e);
+        }
+      }
+      continue;
+    }
+
+    // Determine target list (respecting line of sight)
+    const targets = G.enemies.filter(e => {
+      if (tower.def.range >= 9999 && !tower.aimCursor) {
+        // infinite range towers (sniper/ace/mortar/dartling handled below)
+      }
+      const dx=e.x-tower.x, dy=e.y-tower.y;
+      const dist=Math.sqrt(dx*dx+dy*dy);
+      if (dist>effRange) return false;
+      if (!canHit(tower,e)) return false;
+      if (lineBlocked(tower.x,tower.y,e.x,e.y)) return false; // 3D LoS
+      return true;
+    });
+    if (targets.length===0) continue;
+
+    tower.fireTimer = 1/tower.fireRate;
+    const target = pickTarget(tower, targets);
+
+    // Glue / slow towers
+    if (tower.isGlue && tower.slowDuration>0) {
+      target.slowed=tower.slowDuration; target.slowFactor=tower.slowFactor;
+      if (tower.dot>0){ target.dot=tower.dot; target.dotInterval=tower.dotInterval; target.dotTimer=tower.dotInterval; }
+      if (tower.damage>0) { target.hp-=tower.damage; if(target.hp<=0) killEnemy(target); }
+      addFloat(target.x,target.y-10,'SLOW','#e67e22');
+      continue;
+    }
+
+    // Fire projectiles
+    fireProjectiles(tower, target);
+  }
+}
+
+function dmgTo(tower, e) {
+  let dmg = tower.damage + (tower._buffDmg||0);
+  if (e.def.isMoab) dmg *= (tower.moabDamage||1);
+  return dmg;
+}
+
+function fireProjectiles(tower, target) {
+  const num = tower.numProjectiles||1;
+  let baseAngle = Math.atan2(target.y-tower.y, target.x-tower.x);
+  // Dartling aims at cursor
+  if (tower.aimCursor && G.mouseX!==undefined) baseAngle = Math.atan2(G.mouseY-tower.y, G.mouseX-tower.x);
+  for (let p=0;p<num;p++) {
+    let angle;
+    if (tower.multiTarget) angle = (p/num)*Math.PI*2 + G.aceAngle;
+    else angle = baseAngle + (num>1 ? (p-(num-1)/2)*(Math.PI/14) : 0);
+    G.projectiles.push({
+      id:uid(), x:tower.x, y:tower.y,
+      vx:Math.cos(angle)*tower.projectileSpeed, vy:Math.sin(angle)*tower.projectileSpeed,
+      radius:tower.projectileRadius, damage:dmgTo(tower,target)/(tower.def.isMoab?1:1),
+      rawDamage:tower.damage+(tower._buffDmg||0), moabDamage:tower.moabDamage||1,
+      pierce:tower.pierce, tower, hit:new Set(),
+      isExplosive:tower.isExplosive, explodeRadius:tower.explodeRadius,
+      dot:tower.dot, dotInterval:tower.dotInterval, stun:tower.stun||0,
+      slow:tower.isGlue?tower.slowFactor:0, slowDur:tower.slowDuration,
+      color:tower.def.color, life:2.2,
+    });
+  }
+}
+
+function updateProjectiles(dt) {
+  const remove = [];
+  for (const p of G.projectiles) {
+    p.x+=p.vx*dt; p.y+=p.vy*dt; p.life-=dt;
+    if (p.x<-60||p.x>canvasW+60||p.y<-60||p.y>canvasH+60||p.life<=0){ remove.push(p); continue; }
+    for (const e of [...G.enemies]) {
+      if (p.hit.has(e.id)) continue;
+      const dx=e.x-p.x, dy=e.y-p.y;
+      if (Math.sqrt(dx*dx+dy*dy) < p.radius+e.radius) {
+        p.hit.add(e.id);
+        let dmg = p.rawDamage; if (e.def.isMoab) dmg *= p.moabDamage;
+        e.hp -= dmg;
+        if (p.stun>0 && e.def.isMoab) e.stun = Math.max(e.stun, p.stun*0.5);
+        else if (p.stun>0) e.stun = Math.max(e.stun, p.stun);
+        if (p.dot>0){ e.dot=Math.max(e.dot,p.dot); e.dotInterval=p.dotInterval; e.dotTimer=p.dotInterval; }
+        if (p.slow>0){ e.slowed=p.slowDur; e.slowFactor=p.slow; }
+
+        if (p.isExplosive) {
+          G.visuals.push({type:'explosion', x:p.x, y:p.y, r:p.explodeRadius, life:0.25});
+          for (const e2 of [...G.enemies]) {
+            if (p.hit.has(e2.id)) continue;
+            const d2x=e2.x-p.x, d2y=e2.y-p.y;
+            if (Math.sqrt(d2x*d2x+d2y*d2y) < p.explodeRadius) {
+              p.hit.add(e2.id);
+              let dmg2=p.rawDamage; if(e2.def.isMoab) dmg2*=p.moabDamage;
+              e2.hp-=dmg2;
+              if (p.stun>0) e2.stun=Math.max(e2.stun, e2.def.isMoab?p.stun*0.5:p.stun);
+              if (e2.hp<=0) killEnemy(e2);
+            }
+          }
+          if (e.hp<=0) killEnemy(e);
+          remove.push(p); break;
+        }
+        if (e.hp<=0) killEnemy(e);
+        p.pierce--;
+        if (p.pierce<=0){ remove.push(p); break; }
+      }
+    }
+  }
+  if (remove.length) G.projectiles = G.projectiles.filter(p=>!remove.includes(p));
+}
+
+function updateVisuals(dt) {
+  for (const v of G.visuals) v.life -= dt;
+  G.visuals = G.visuals.filter(v=>v.life>0);
+}
+
+// ---------- HERO ABILITY ----------
+function useHeroAbility() {
+  const t = G.selectedTower;
+  if (!t || !t.isHero) return;
+  const ab = t.def.ability;
+  if (t.heroLevel < ab.lvl) return;
+  if (t.heroAbilityCd > 0) return;
+  t.heroAbilityCd = ab.cooldown;
+
+  const kind = t.def.heroKind;
+  if (kind==='quincy' || kind==='etienne') {
+    // volley: damage many bloons
+    G.enemies.slice().sort((a,b)=>b.t-a.t).slice(0,30).forEach(e=>{ e.hp -= 15*t.heroLevel/3; G.visuals.push({type:'slash',x:e.x,y:e.y,life:0.2}); if(e.hp<=0) killEnemy(e); });
+  } else if (kind==='gwendolin') {
+    G.enemies.forEach(e=>{ if(canHit(t,e)){ e.dot=5; e.dotInterval=0.3; e.dotTimer=0.3; }});
+    addFloat(t.x,t.y-20,'🔥 FIRE!','#e67e22');
+  } else if (kind==='sauda') {
+    G.enemies.forEach(e=>{ e.hp -= 8*t.heroLevel/2; G.visuals.push({type:'slash',x:e.x,y:e.y,life:0.15}); if(e.hp<=0) killEnemy(e); });
+  } else if (kind==='benjamin' || kind==='geraldo') {
+    const amt = 500 + t.heroLevel*200;
+    if (!G.sandbox) G.cash += amt;
+    addFloat(t.x,t.y-20,'+$'+amt,'#ffd700');
+  } else if (kind==='ezili') {
+    // hex the strongest moab
+    const moab = G.enemies.filter(e=>e.def.isMoab).sort((a,b)=>b.hp-a.hp)[0];
+    if (moab){ moab.dot=moab.maxHp/5; moab.dotInterval=1; moab.dotTimer=1; addFloat(moab.x,moab.y,'HEXED','#8e44ad'); }
+  } else if (kind==='obyn') {
+    // wall of trees: damage front bloons
+    G.enemies.slice().sort((a,b)=>b.t-a.t).slice(0,10).forEach(e=>{ e.hp-=50; if(e.hp<=0) killEnemy(e); });
+    addFloat(t.x,t.y-20,'🌲 WALL','#27ae60');
+  } else if (kind==='adora') {
+    // sacrifice weakest nearby tower
+    let weakest=null, wc=Infinity;
+    for (const o of G.towers) {
+      if (o===t || o.isHero) continue;
+      const dx=o.x-t.x, dy=o.y-t.y;
+      if (Math.sqrt(dx*dx+dy*dy) <= t.range*1.5 && o.totalCost<wc){ wc=o.totalCost; weakest=o; }
+    }
+    if (weakest) {
+      G.towers = G.towers.filter(x=>x!==weakest);
+      t.sacBonus += 3; t.heroXP += 200;
+      recomputeTowerStats(t);
+      addFloat(t.x,t.y-20,'SACRIFICE! +DMG','#f1c40f');
+    } else {
+      addFloat(t.x,t.y-20,'No tower nearby','#ff2244');
+      t.heroAbilityCd = 2;
+    }
+  }
+  showUpgradePanel(t);
+}
+
+function gainHeroXP(amount) {
+  const hero = G.towers.find(t=>t.isHero);
+  if (!hero) return;
+  hero.heroXP += amount;
+  const needed = hero.heroLevel * 180;
+  if (hero.heroXP >= needed && hero.heroLevel < 20) {
+    hero.heroXP -= needed;
+    hero.heroLevel++;
+    recomputeTowerStats(hero);
+    addFloat(hero.x, hero.y-25, 'LVL '+hero.heroLevel, '#ff4da6');
+  }
+}
+
+// ---------- GAME OVER / WIN ----------
+function computeReward() {
+  if (G.sandbox) return 0;
+  const base = G.round * 4 + Math.floor(G.cashEarned/100);
+  return Math.round(base * G.diff.reward * (1 + upValue('mmBoost')));
+}
+function triggerGameOver() {
+  G.gameOver = true;
+  const reward = computeReward();
+  profile.monkeyMoney += reward; saveProfile();
+  const ov = document.getElementById('gameover-overlay');
+  const title = document.getElementById('gameover-title');
+  title.className = 'gameover-title'; title.textContent = 'GAME OVER';
+  document.getElementById('gameover-info').textContent = `Reached Round ${G.round} on ${G.diff.name} · Kills: ${G.totalKills}`;
+  document.getElementById('gameover-reward').textContent = `💰 Earned ${reward} Monkey Money!`;
+  ov.classList.add('show');
+}
+function triggerWin() {
+  G.gameOver = true; G.won = true;
+  const reward = Math.round(computeReward() * 1.5);
+  profile.monkeyMoney += reward; saveProfile();
+  const ov = document.getElementById('gameover-overlay');
+  const title = document.getElementById('gameover-title');
+  title.className = 'gameover-title victory-title'; title.textContent = '🏆 VICTORY!';
+  document.getElementById('gameover-info').textContent = `You beat ${G.diff.name} mode! Kills: ${G.totalKills}`;
+  document.getElementById('gameover-reward').textContent = `💰 Earned ${reward} Monkey Money!`;
+  ov.classList.add('show');
+}
+
+// ---------- RENDER ----------
+function render() {
+  if (!G) return;
+  const ctx = document.getElementById('game-canvas').getContext('2d');
+  const map = MAPS[G.mapKey];
+  ctx.clearRect(0,0,canvasW,canvasH);
+  ctx.fillStyle = map.bg; ctx.fillRect(0,0,canvasW,canvasH);
+
+  // grid
+  ctx.strokeStyle='rgba(255,255,255,0.03)'; ctx.lineWidth=1;
+  for (let x=0;x<canvasW;x+=40){ ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,canvasH); ctx.stroke(); }
+  for (let y=0;y<canvasH;y+=40){ ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(canvasW,y); ctx.stroke(); }
+
+  // path
+  ctx.save();
+  ctx.shadowColor='rgba(0,0,0,0.5)'; ctx.shadowBlur=10;
+  ctx.strokeStyle='#3d2b1f'; ctx.lineWidth=50; ctx.lineCap='round'; ctx.lineJoin='round';
+  ctx.beginPath(); ctx.moveTo(PATH_POINTS[0].x,PATH_POINTS[0].y);
+  for (let i=1;i<PATH_POINTS.length;i++) ctx.lineTo(PATH_POINTS[i].x,PATH_POINTS[i].y);
+  ctx.stroke();
+  ctx.strokeStyle=map.pathColor; ctx.lineWidth=42; ctx.stroke();
+  ctx.setLineDash([8,16]); ctx.strokeStyle='rgba(255,255,255,0.08)'; ctx.lineWidth=38; ctx.stroke();
+  ctx.setLineDash([]); ctx.restore();
+
+  // obstacles (3D-ish blocks)
+  for (const o of OBSTACLES) drawObstacle(ctx, o);
+
+  // selected tower range
+  if (G.selectedTower && !G.selectedTower.isFarm) {
+    const t=G.selectedTower;
+    const r = (t.range||150) * (t._buffRange||1);
+    ctx.beginPath(); ctx.arc(t.x,t.y, t.isFreeze?t.freezeRadius:r, 0, Math.PI*2);
+    ctx.fillStyle='rgba(0,212,255,0.05)'; ctx.fill();
+    ctx.strokeStyle='rgba(0,212,255,0.3)'; ctx.lineWidth=1; ctx.stroke();
+  }
+
+  // towers
+  for (const tower of G.towers) drawTower(ctx, tower);
+
+  // projectiles
+  for (const p of G.projectiles) { ctx.beginPath(); ctx.arc(p.x,p.y,p.radius,0,Math.PI*2); ctx.fillStyle=p.color; ctx.fill(); }
+
+  // visuals
+  for (const v of G.visuals) drawVisual(ctx, v);
+
+  // enemies
+  for (const e of G.enemies) drawEnemy(ctx, e);
+
+  // placing preview
+  if (G.placingTower && G.mouseX!==undefined) drawPlacingPreview(ctx);
+}
+
+function drawObstacle(ctx, o) {
+  ctx.save();
+  ctx.translate(o.x, o.y);
+  // shadow for 3D feel
+  ctx.beginPath(); ctx.ellipse(4,6,o.r,o.r*0.5,0,0,Math.PI*2); ctx.fillStyle='rgba(0,0,0,0.35)'; ctx.fill();
+  if (o.type==='tree') {
+    ctx.fillStyle='#3a2410'; ctx.fillRect(-4,0,8,o.r*0.6);
+    ctx.beginPath(); ctx.arc(0,-o.r*0.3,o.r,0,Math.PI*2); ctx.fillStyle='#1e5631'; ctx.fill();
+    ctx.beginPath(); ctx.arc(-o.r*0.4,0,o.r*0.7,0,Math.PI*2); ctx.fillStyle='#247a3f'; ctx.fill();
+  } else if (o.type==='log') {
+    ctx.fillStyle='#5a3a20'; ctx.beginPath(); ctx.ellipse(0,0,o.r,o.r*0.6,0,0,Math.PI*2); ctx.fill();
+    ctx.strokeStyle='#3a2410'; ctx.lineWidth=3; ctx.beginPath(); ctx.arc(0,0,o.r*0.4,0,Math.PI*2); ctx.stroke();
+  } else {
+    // boulder
+    const grad = ctx.createRadialGradient(-o.r*0.3,-o.r*0.3,o.r*0.2, 0,0,o.r);
+    grad.addColorStop(0,'#8a8a8a'); grad.addColorStop(1,'#4a4a4a');
+    ctx.beginPath(); ctx.arc(0,0,o.r,0,Math.PI*2); ctx.fillStyle=grad; ctx.fill();
+    ctx.strokeStyle='#333'; ctx.lineWidth=2; ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawTower(ctx, tower) {
+  const sel = G.selectedTower===tower;
+  ctx.save(); ctx.translate(tower.x,tower.y);
+  ctx.beginPath(); ctx.arc(0,0,tower.isHero?20:18,0,Math.PI*2);
+  ctx.fillStyle = sel?'#1a3050':'#1a2a1a';
+  ctx.fill();
+  ctx.strokeStyle = sel?'#00d4ff':(tower.isHero?'#ff4da6':tower.def.color);
+  ctx.lineWidth = sel?3:(tower.isHero?3:2); ctx.stroke();
+  ctx.font = tower.isHero?'18px serif':'16px serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+  ctx.fillText(tower.def.icon,0,0);
+  if (tower.isHero) {
+    ctx.fillStyle='#ff4da6'; ctx.font='bold 8px Orbitron,sans-serif';
+    ctx.fillText('L'+tower.heroLevel, 0, 26);
+  } else {
+    for (let i=0;i<3;i++){
+      const lvl=tower.upgradeLevels[i];
+      if (lvl>0){
+        const ax=Math.cos(i*Math.PI*2/3-Math.PI/2)*22, ay=Math.sin(i*Math.PI*2/3-Math.PI/2)*22;
+        ctx.beginPath(); ctx.arc(ax,ay,5,0,Math.PI*2);
+        ctx.fillStyle=['#00d4ff','#ff6b00','#00ff88'][i]; ctx.fill();
+        ctx.fillStyle='#fff'; ctx.font='bold 7px sans-serif'; ctx.fillText(lvl,ax,ay);
+      }
+    }
+  }
+  ctx.restore();
+}
+
+function drawEnemy(ctx, e) {
+  ctx.save(); ctx.translate(e.x,e.y);
+  ctx.beginPath(); ctx.ellipse(2,4,e.radius,e.radius*0.4,0,0,Math.PI*2); ctx.fillStyle='rgba(0,0,0,0.3)'; ctx.fill();
+  ctx.beginPath(); ctx.arc(0,0,e.radius,0,Math.PI*2);
+  ctx.fillStyle = e.frozen>0?'#aaddff':(e.slowed>0?shade(e.def.color):e.def.color); ctx.fill();
+  if (e.def.outline){ ctx.strokeStyle=e.def.outline; ctx.lineWidth=2; ctx.stroke(); }
+  if (e.def.isRainbow){
+    const cs=['#e74c3c','#e67e22','#f1c40f','#27ae60','#3498db','#8e44ad'];
+    ctx.fillStyle=cs[Math.floor((Date.now()/100)%cs.length)];
+    ctx.beginPath(); ctx.arc(0,0,e.radius*0.6,0,Math.PI*2); ctx.fill();
+  }
+  if (e.def.camo){ ctx.strokeStyle='rgba(0,255,136,0.7)'; ctx.lineWidth=2; ctx.setLineDash([3,3]); ctx.beginPath(); ctx.arc(0,0,e.radius+2,0,Math.PI*2); ctx.stroke(); ctx.setLineDash([]); }
+  if (e.def.isMoab){
+    ctx.fillStyle='rgba(255,255,255,0.95)'; ctx.font=`bold ${Math.min(11,e.radius*0.5)}px monospace`;
+    ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(e.def.name,0,0);
+  }
+  if (e.hp<e.maxHp){
+    const bw=e.radius*2.5, by=-e.radius-6;
+    ctx.fillStyle='#333'; ctx.fillRect(-bw/2,by,bw,3);
+    ctx.fillStyle = e.hp/e.maxHp>0.5?'#27ae60':e.hp/e.maxHp>0.25?'#f39c12':'#e74c3c';
+    ctx.fillRect(-bw/2,by,bw*(e.hp/e.maxHp),3);
+  }
+  ctx.restore();
+}
+function shade(hex){ return hex; }
+
+function drawVisual(ctx, v) {
+  if (v.type==='explosion'){
+    ctx.beginPath(); ctx.arc(v.x,v.y,v.r*(1-v.life/0.25*0.3),0,Math.PI*2);
+    ctx.fillStyle=`rgba(255,140,0,${v.life/0.25*0.5})`; ctx.fill();
+  } else if (v.type==='slash'){
+    ctx.strokeStyle=`rgba(255,255,255,${v.life/0.15})`; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.moveTo(v.x-12,v.y-12); ctx.lineTo(v.x+12,v.y+12); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(v.x+12,v.y-12); ctx.lineTo(v.x-12,v.y+12); ctx.stroke();
+  }
+}
+
+function drawPlacingPreview(ctx) {
+  const def=G.placingTower.def;
+  const ok = canPlaceAt(G.mouseX,G.mouseY);
+  ctx.save(); ctx.globalAlpha=0.75; ctx.translate(G.mouseX,G.mouseY);
+  if (def.range>0 && def.range<9999){
+    ctx.beginPath(); ctx.arc(0,0,def.range,0,Math.PI*2);
+    ctx.fillStyle='rgba(0,212,255,0.1)'; ctx.fill();
+    ctx.strokeStyle='rgba(0,212,255,0.4)'; ctx.lineWidth=1; ctx.stroke();
+  }
+  ctx.beginPath(); ctx.arc(0,0,18,0,Math.PI*2);
+  ctx.fillStyle=ok?'rgba(0,255,136,0.3)':'rgba(255,34,68,0.3)'; ctx.fill();
+  ctx.strokeStyle=ok?'#00ff88':'#ff2244'; ctx.lineWidth=2; ctx.stroke();
+  ctx.font='16px serif'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(def.icon,0,0);
+  ctx.restore();
+}
+
+function canPlaceAt(x,y) {
+  for (let t=0;t<=1;t+=0.004){ const pos=getPathPos(t,PATH_POINTS); const dx=pos.x-x,dy=pos.y-y; if(Math.sqrt(dx*dx+dy*dy)<35) return false; }
+  for (const tower of G.towers){ const dx=tower.x-x,dy=tower.y-y; if(Math.sqrt(dx*dx+dy*dy)<40) return false; }
+  for (const o of OBSTACLES){ const dx=o.x-x,dy=o.y-y; if(Math.sqrt(dx*dx+dy*dy)<o.r+18) return false; }
+  if (x<10||x>canvasW-10||y<10||y>canvasH-10) return false;
+  return true;
+}
+
+// ---------- FLOAT TEXT ----------
+function addFloat(x,y,text,color) {
+  if (!text) return;
+  const wrap=document.getElementById('canvas-wrap');
+  const el=document.createElement('div');
+  el.className='float-text'; el.style.left=x+'px'; el.style.top=y+'px'; el.style.color=color; el.textContent=text;
+  wrap.appendChild(el);
+  setTimeout(()=>el.remove(),900);
+}
+
+// ---------- LOOP ----------
+function loop() {
+  const now=performance.now();
+  const raw=(now-lastTime)/1000; lastTime=now;
+  const dt=Math.min(raw,0.05)*(G?G.speed:1);
+  if (G && !G.gameOver) {
+    G.aceAngle += dt*1.5;
+    updateWave(dt);
+    updateEnemies(dt);
+    updateTowers(dt);
+    updateProjectiles(dt);
+    updateVisuals(dt);
+    // ace/heli/mortar circle motion for infinite range flyers
+    moveFlyers(dt);
+  }
+  render();
+  animFrameId=requestAnimationFrame(loop);
+}
+
+function moveFlyers(dt) {
+  for (const t of G.towers) {
+    if (t.def.id==='ace') {
+      // circle around center
+      t._ang = (t._ang||0) + dt*0.8;
+      if (t._cx===undefined){ t._cx=t.x; t._cy=t.y; }
+      t.x = t._cx + Math.cos(t._ang)*Math.min(canvasW,canvasH)*0.28;
+      t.y = t._cy + Math.sin(t._ang)*Math.min(canvasW,canvasH)*0.28;
+    }
+  }
+}
+
+// ---------- INPUT ----------
+function onCanvasClick(e) {
+  if (!G || G.gameOver) return;
+  const rect=e.target.getBoundingClientRect();
+  const x=(e.clientX-rect.left)*(canvasW/rect.width);
+  const y=(e.clientY-rect.top)*(canvasH/rect.height);
+
+  if (G.placingTower) {
+    if (!canPlaceAt(x,y)) return;
+    const def=G.placingTower.def;
+    const isHero = !!def.hero;
+    const cost = isHero?def.cost:towerCost(def);
+    if (!G.sandbox && G.cash<cost){ G.placingTower=null; return; }
+    const tower=createTower(def,x,y,isHero);
+    if (def.id==='ace'){ tower._cx=x; tower._cy=y; tower._ang=0; }
+    G.towers.push(tower);
+    if (isHero) G.heroPlaced=true;
+    if (!G.sandbox) spendCash(cost);
+    G.placingTower=null;
+    buildShop();
+    return;
+  }
+
+  let clicked=null;
+  for (const tower of G.towers){ const dx=tower.x-x,dy=tower.y-y; if(Math.sqrt(dx*dx+dy*dy)<22){ clicked=tower; break; } }
+  if (clicked){ G.selectedTower=clicked; showUpgradePanel(clicked); }
+  else { G.selectedTower=null; showShopPanel(); }
+}
+function onCanvasMouseMove(e) {
+  if (!G) return;
+  const rect=e.target.getBoundingClientRect();
+  G.mouseX=(e.clientX-rect.left)*(canvasW/rect.width);
+  G.mouseY=(e.clientY-rect.top)*(canvasH/rect.height);
+  // Heli follows cursor
+  for (const t of G.towers){ if (t.def.id==='heli' && t._follow){ t.x=G.mouseX; t.y=G.mouseY; } }
+}
+
+// ---------- SHOP UI ----------
+function placeTower(def) {
+  if (!G || G.gameOver) return;
+  const cost = def.hero?def.cost:towerCost(def);
+  if (!G.sandbox && G.cash<cost) return;
+  if (def.hero && G.heroPlaced) return;
+  G.placingTower={def};
+  G.selectedTower=null; showShopPanel();
+}
+
+function buildShop() {
+  const content=document.getElementById('panel-content');
+  content.innerHTML='';
+
+  // Hero card
+  if (G.heroId && !G.heroPlaced) {
+    const h=HERO_DEFS.find(x=>x.id===G.heroId);
+    const title=document.createElement('div'); title.className='section-title'; title.style.color='var(--hero)'; title.textContent='HERO'; content.appendChild(title);
+    const card=document.createElement('div'); card.className='tower-card hero-card'; card.id='shop-'+h.id;
+    card.innerHTML=`<div class="tower-card-header"><span style="font-size:1.2rem;">${h.icon}</span><span class="tower-cost">$${h.cost}</span></div>
+      <div class="tower-name" style="color:var(--hero);">${h.name}</div><div class="tower-desc">${h.desc}</div>`;
+    card.onclick=()=>{ if(G.sandbox||G.cash>=h.cost) placeTower(h); };
+    content.appendChild(card);
+  }
+
+  const cats=['PRIMARY','MILITARY','MAGIC','SUPPORT'];
+  for (const cat of cats) {
+    const defs=TOWER_DEFS.filter(d=>d.category===cat);
+    const title=document.createElement('div'); title.className='section-title'; title.textContent=cat; content.appendChild(title);
+    for (const def of defs) {
+      const cost=towerCost(def);
+      const card=document.createElement('div'); card.className='tower-card'; card.id='shop-'+def.id;
+      card.innerHTML=`<div class="tower-card-header"><span style="font-size:1.2rem;">${def.icon}</span><span class="tower-cost">$${cost}</span></div>
+        <div class="tower-name">${def.name}</div><div class="tower-desc">${def.desc}</div>`;
+      card.onclick=()=>{ if(G.sandbox||G.cash>=cost) placeTower(def); };
+      content.appendChild(card);
+    }
+  }
+  updateShopAfford();
+  showShopPanel();
+}
+
+function updateShopAfford() {
+  if (!G) return;
+  const allDefs=[...TOWER_DEFS, ...HERO_DEFS];
+  for (const def of allDefs) {
+    const card=document.getElementById('shop-'+def.id);
+    if (card) card.classList.toggle('cant-afford', !G.sandbox && G.cash < (def.hero?def.cost:towerCost(def)));
+  }
+}
+
+function showShopPanel() {
+  document.getElementById('panel-content').style.display='block';
+  document.getElementById('upgrade-panel').classList.remove('visible');
+}
+
+function showUpgradePanel(tower) {
+  document.getElementById('panel-content').style.display='none';
+  const up=document.getElementById('upgrade-panel'); up.classList.add('visible');
+  document.getElementById('upg-name').textContent = tower.def.name + (tower.isHero?` (Lvl ${tower.heroLevel})`:'');
+
+  let stats=`DMG: ${(+tower.damage).toFixed(1)} | RNG: ${Math.round(tower.range)} | SPD: ${tower.fireRate.toFixed(2)}/s<br>Pierce: ${tower.pierce}`;
+  if (tower.moabDamage>1) stats+=` | MOAB x${tower.moabDamage}`;
+  if (tower.roundIncome>0) stats+=`<br>Income: +$${Math.round(tower.roundIncome)}/round`;
+  if (tower.camo) stats+=` | 👁 Camo`;
+  stats+=`<br>Invested: $${Math.round(tower.totalCost)}`;
+  document.getElementById('upg-stats').innerHTML=stats;
+
+  const paths=document.getElementById('upg-paths'); paths.innerHTML='';
+  const abilityBtn=document.getElementById('ability-btn');
+
+  if (tower.isHero) {
+    abilityBtn.style.display='block';
+    const ab=tower.def.ability;
+    const ready = tower.heroLevel>=ab.lvl && tower.heroAbilityCd<=0;
+    abilityBtn.disabled = !ready;
+    abilityBtn.textContent = tower.heroLevel<ab.lvl ? `${ab.name} (Lvl ${ab.lvl})` : (tower.heroAbilityCd>0 ? `${ab.name} (${Math.ceil(tower.heroAbilityCd)}s)` : `⚡ ${ab.name}`);
+    const info=document.createElement('div');
+    info.style.cssText='font-size:0.68rem;color:var(--text-dim);line-height:1.5;';
+    const need = tower.heroLevel*180;
+    info.innerHTML = `<b style="color:var(--hero)">Hero levels up automatically as you play.</b><br>XP: ${Math.floor(tower.heroXP)}/${need}<br><br>✦ ${tower.def.special}<br><br>Ability: <b>${ab.name}</b> — ${ab.desc}`;
+    paths.appendChild(info);
+  } else {
+    abilityBtn.style.display='none';
+    const pathColors=['#00d4ff','#ff6b00','#00ff88'];
+    // tier restriction: only 2 paths can go past tier 2, only 1 past tier 0? Simplified BTD6 rule: max one path>2, one path>0
+    const tiers = tower.upgradeLevels.slice();
+    for (let pi=0; pi<tower.def.upgrades.length; pi++) {
+      const path=tower.def.upgrades[pi];
+      const cur=tower.upgradeLevels[pi];
+      const div=document.createElement('div'); div.className='upgrade-path';
+      div.innerHTML=`<div class="upgrade-path-label" style="color:${pathColors[pi]};">${path.name} (${cur}/5)</div>`;
+      if (cur>=path.levels.length) {
+        const b=document.createElement('button'); b.className='upgrade-btn maxed'; b.textContent='✓ MAXED'; div.appendChild(b);
+      } else {
+        const upg=path.levels[cur];
+        const b=document.createElement('button'); b.className='upgrade-btn';
+        // check tier restriction
+        const restricted = tierRestricted(tiers, pi, cur+1);
+        b.innerHTML=`<span>${upg.name}<br><small style="color:var(--text-dim)">${upg.desc}</small></span><span class="upgrade-btn-cost">$${upg.cost}</span>`;
+        if (restricted){ b.className='upgrade-btn locked-tier'; b.innerHTML=`<span>🔒 ${upg.name}<br><small>Locked (path rule)</small></span>`; b.disabled=true; }
+        else { b.disabled=!G.sandbox && G.cash<upg.cost; b.onclick=()=>buyUpgrade(tower,pi,cur); }
+        div.appendChild(b);
+      }
+      paths.appendChild(div);
+    }
+  }
+
+  // targeting
+  const tgt=document.getElementById('target-btn');
+  tgt.style.display = (tower.isFarm||tower.isVillage) ? 'none':'block';
+  tgt.textContent='TARGET: '+tower.targeting.toUpperCase();
+
+  const disc = G.sandbox?0.7:(0.7 + upValue('sellValue'));
+  document.getElementById('sell-btn').textContent=`SELL ($${Math.round(tower.totalCost*disc)})`;
+}
+
+// BTD6 rule: max 2 upgrade paths, and only one path may exceed tier 2 (crosspathing)
+function tierRestricted(tiers, pi, targetTier) {
+  const others = tiers.filter((_,i)=>i!==pi);
+  const pathsStarted = tiers.filter((v,i)=> i!==pi && v>0).length;
+  // can't have 3 paths with upgrades
+  if (tiers[pi]===0 && pathsStarted>=2) return true;
+  // only one path above tier 2
+  if (targetTier>=3) {
+    const anotherAbove2 = others.some(v=>v>=3);
+    if (anotherAbove2) return true;
+  }
+  return false;
+}
+
+function buyUpgrade(tower, pathIndex, levelIndex) {
+  const upg=tower.def.upgrades[pathIndex].levels[levelIndex];
+  if (!G.sandbox && G.cash<upg.cost) return;
+  if (!G.sandbox) { spendCash(upg.cost); }
+  tower.totalCost += upg.cost;
+  tower.upgradeLevels[pathIndex] = levelIndex+1;
+  recomputeTowerStats(tower);
+  showUpgradePanel(tower);
+  updateShopAfford();
+}
+
+function cycleTargeting() {
+  const t=G.selectedTower; if(!t) return;
+  const modes=['first','last','close','strong'];
+  t.targeting=modes[(modes.indexOf(t.targeting)+1)%modes.length];
+  document.getElementById('target-btn').textContent='TARGET: '+t.targeting.toUpperCase();
+}
+
+function deselectTower() {
+  if (!G) return;
+  G.selectedTower=null; G.placingTower=null; showShopPanel();
+}
+
+function sellSelectedTower() {
+  if (!G.selectedTower) return;
+  const t=G.selectedTower;
+  const disc = G.sandbox?0.7:(0.7+upValue('sellValue'));
+  if (!G.sandbox) { G.cash += Math.round(t.totalCost*disc); }
+  if (t.isHero) G.heroPlaced=false;
+  G.towers=G.towers.filter(x=>x!==t);
+  G.selectedTower=null;
+  buildShop(); updateHUD();
+}
+
+// ---------- HUD ----------
+function updateHUD() {
+  if (!G) return;
+  document.getElementById('hud-round').textContent = G.round;
+  document.getElementById('hud-cash').textContent = G.sandbox?'∞':'$'+Math.floor(G.cash);
+  document.getElementById('hud-lives').textContent = G.sandbox?'∞':Math.max(0,Math.floor(G.lives));
+  document.getElementById('hud-income').textContent = G.sandbox?'—':Math.round(getIncomeMultiplier(G.round)*G.diff.cashMul*100)+'%';
+  updateShopAfford();
+  if (G.selectedTower) {
+    // update affordability of upgrade buttons only
+    document.querySelectorAll('#upg-paths .upgrade-btn:not(.maxed):not(.locked-tier)').forEach(b=>{
+      const c=b.querySelector('.upgrade-btn-cost'); if(c){ const cost=parseInt(c.textContent.replace('$','')); b.disabled=!G.sandbox && G.cash<cost; }
+    });
+    if (G.selectedTower.isHero) {
+      const ab=G.selectedTower.def.ability;
+      const btn=document.getElementById('ability-btn');
+      const ready=G.selectedTower.heroLevel>=ab.lvl && G.selectedTower.heroAbilityCd<=0;
+      btn.disabled=!ready;
+      btn.textContent = G.selectedTower.heroLevel<ab.lvl?`${ab.name} (Lvl ${ab.lvl})`:(G.selectedTower.heroAbilityCd>0?`${ab.name} (${Math.ceil(G.selectedTower.heroAbilityCd)}s)`:`⚡ ${ab.name}`);
+    }
+  }
+}
+
+function setSpeed(s) {
+  if (!G) return; G.speed=s;
+  [1,2,3].forEach(n=>document.getElementById('spd'+n).classList.toggle('active',n===s));
+}
+
+function toggleAutostart() {
+  if (!G) return;
+  G.autostart=!G.autostart;
+  const b=document.getElementById('autostart-btn');
+  b.classList.toggle('on',G.autostart);
+  b.textContent = G.autostart?'AUTO ✓':'AUTO ▶';
+  if (G.autostart && !G.waveActive && !G.gameOver) doStartWave();
+}
+
+// Hero XP passively grows each kill via updateHUD loop hook — simpler: grant on kill
+const _origKill = killEnemy;
+
+// ---------- SANDBOX ----------
+function toggleSandboxPanel() { document.getElementById('sandbox-panel').classList.toggle('show'); }
+function buildSandboxButtons() {
+  const c=document.getElementById('sb-bloon-buttons'); c.innerHTML='';
+  BLOON_ORDER.forEach(type=>{
+    const d=ENEMY_TYPES[type];
+    const b=document.createElement('button'); b.className='sb-btn';
+    b.textContent=`${d.name} (${d.hp}hp)`;
+    b.onclick=()=>{ for(let i=0;i<(d.isMoab?1:5);i++) spawnEnemy(type, 0.001*i); };
+    c.appendChild(b);
+  });
+}
+function sandboxSetRound() { G.round=Math.max(1,parseInt(document.getElementById('sb-round-input').value)||1); updateHUD(); }
+function sandboxSpawnWave() { const comp=getWaveComposition(G.round); comp.forEach((t,i)=>setTimeout(()=>{if(G)spawnEnemy(t)}, i*80)); }
+function sandboxAddCash() { G.cash+=100000; updateHUD(); }
+function sandboxClearBloons() { G.enemies=[]; }
+function sandboxMaxLives() { G.lives=999999; updateHUD(); }
+
+// ---------- SAVE / LOAD (run) ----------
+function switchSaveTab(tab) {
+  document.getElementById('save-pane').style.display = tab==='save'?'block':'none';
+  document.getElementById('load-pane').style.display = tab==='load'?'block':'none';
+}
+function generateSaveCode() {
+  const data={ v:2, mm:profile.monkeyMoney, ups:profile.upgrades, game:null };
+  if (G && !G.gameOver) {
+    data.game={
+      diff:G.difficulty, map:G.mapKey, hero:G.heroId, heroPlaced:G.heroPlaced,
+      round:G.round, cash:Math.floor(G.cash), lives:Math.floor(G.lives),
+      towers:G.towers.map(t=>({d:t.defId,x:Math.round(t.x),y:Math.round(t.y),u:t.upgradeLevels.slice(),c:Math.round(t.totalCost),h:t.isHero?1:0,hl:t.heroLevel,hx:Math.round(t.heroXP),sb:t.sacBonus,tg:t.targeting}))
+    };
+  }
+  return btoa(unescape(encodeURIComponent(JSON.stringify(data))));
+}
+function loadFromSaveCode(code) {
+  try { const d=JSON.parse(decodeURIComponent(escape(atob(code.trim())))); return (d && (d.v===1||d.v===2))?d:false; } catch(e){ return false; }
+}
+function showSaveModal() { document.getElementById('save-code-text').value=generateSaveCode(); switchSaveTab('save'); document.getElementById('save-load-modal').classList.add('show'); }
+function hideSaveModal() { document.getElementById('save-load-modal').classList.remove('show'); }
+function showLoadFromMenu() { document.getElementById('save-load-modal').classList.add('show'); switchSaveTab('load'); document.getElementById('load-code-input').value=''; document.getElementById('load-status').textContent=''; }
+function copySaveCode() {
+  const ta=document.getElementById('save-code-text'); ta.select();
+  navigator.clipboard.writeText(ta.value).then(()=>{ document.getElementById('save-copy-status').textContent='✓ Copied!'; setTimeout(()=>document.getElementById('save-copy-status').textContent='',2000); });
+}
+function doLoadGame() {
+  const code=document.getElementById('load-code-input').value.trim();
+  if (!code){ document.getElementById('load-status').textContent='Enter a code.'; return; }
+  const d=loadFromSaveCode(code);
+  if (!d){ document.getElementById('load-status').textContent='✗ Invalid code.'; return; }
+  // restore monkey money & upgrades
+  if (d.mm!==undefined) profile.monkeyMoney=d.mm;
+  if (d.ups) profile.upgrades=d.ups;
+  saveProfile();
+
+  if (d.game) {
+    pendingDifficulty=d.game.diff||'normal'; pendingMap=d.game.map||'monkey_meadow'; pendingHero=d.game.hero||null;
+    startGame();
+    G.round=d.game.round; G.cash=d.game.cash; G.lives=d.game.lives; G.heroPlaced=!!d.game.heroPlaced;
+    G.towers=[];
+    for (const td of d.game.towers) {
+      const def=getDefById(td.d); if(!def) continue;
+      const t=createTower(def, td.x, td.y, !!td.h);
+      t.upgradeLevels=td.u||[0,0,0]; t.totalCost=td.c||def.cost;
+      t.heroLevel=td.hl||1; t.heroXP=td.hx||0; t.sacBonus=td.sb||0; t.targeting=td.tg||'first';
+      if (def.id==='ace'){ t._cx=td.x; t._cy=td.y; t._ang=0; }
+      recomputeTowerStats(t);
+      G.towers.push(t);
+    }
+    buildShop(); updateHUD();
+    hideSaveModal();
+  } else {
+    hideSaveModal();
+    refreshMenuMM();
+    alert('Monkey money & upgrades restored! ('+Math.floor(profile.monkeyMoney)+' MM)');
+  }
 }
 
 // ---------- PERSISTENT UPGRADE SHOP ----------
-const SHOP_UPGRADES = [
-  { id:'startCash', name:'Starting Cash', desc:'+$150 starting cash per level', baseCost:200, max:8, per:150, unit:'$' },
-  { id:'startLives', name:'Starting Lives', desc:'+15 starting lives per level', baseCost:250, max:6, per:15, unit:'lives' },
-  { id:'income', name:'Global Income', desc:'+5% end-of-round bonus cash per level', baseCost:300, max:6, per:0.05, unit:'%' },
-  { id:'towerDmg', name:'Sharper Monkeys', desc:'+4% all tower damage per level', baseCost:400, max:6, per:0.04, unit:'%' },
-  { id:'towerSpeed', name:'Faster Monkeys', desc:'+4% all attack speed per level', baseCost:400, max:6, per:0.04, unit:'%' },
-  { id:'sellValue', name:'Better Resale', desc:'+3% sell value per level', baseCost:150, max:5, per:0.03, unit:'%' },
-  { id:'discount', name:'Bulk Discount', desc:'-2% tower cost per level', baseCost:500, max:5, per:0.02, unit:'%' },
-  { id:'mmBoost', name:'Money Magnet', desc:'+10% monkey money earned per level', baseCost:600, max:5, per:0.1, unit:'%' },
-];
+function upgradeCost(u) { return Math.round(u.baseCost * Math.pow(1.6, upLevel(u.id))); }
+function openUpgradeShop() {
+  document.getElementById('shop-mm').textContent=Math.floor(profile.monkeyMoney).toLocaleString();
+  const list=document.getElementById('upgrade-shop-list'); list.innerHTML='';
+  SHOP_UPGRADES.forEach(u=>{
+    const lvl=upLevel(u.id); const maxed=lvl>=u.max; const cost=upgradeCost(u);
+    const cur = u.unit==='%'? Math.round(lvl*u.per*100)+'%' : u.unit==='$'? '+$'+(lvl*u.per) : '+'+(lvl*u.per)+' '+u.unit;
+    const item=document.createElement('div'); item.className='up-item';
+    item.innerHTML=`<div style="flex:1;"><h4>${u.name} <span style="color:var(--text-dim);font-size:0.7rem;">Lv ${lvl}/${u.max}</span></h4><p>${u.desc}</p><p style="color:var(--accent3);">Current: ${cur}</p></div>`;
+    const btn=document.createElement('button');
+    btn.className='btn btn-small up-buy';
+    if (maxed){ btn.textContent='MAX'; btn.disabled=true; }
+    else { btn.textContent='$'+cost.toLocaleString(); btn.disabled=profile.monkeyMoney<cost; btn.onclick=()=>buyPermUpgrade(u.id); }
+    item.appendChild(btn);
+    list.appendChild(item);
+  });
+}
+function buyPermUpgrade(id) {
+  const u=SHOP_UPGRADES.find(x=>x.id===id);
+  const cost=upgradeCost(u);
+  if (profile.monkeyMoney<cost || upLevel(id)>=u.max) return;
+  profile.monkeyMoney-=cost; profile.upgrades[id]=upLevel(id)+1;
+  saveProfile(); openUpgradeShop();
+}
+function closeUpgradeShop() { document.getElementById('upgrade-shop-modal').classList.remove('show'); }
+// wire openUpgradeShop to show modal
+const _openUp = openUpgradeShop;
+openUpgradeShop = function(){ document.getElementById('upgrade-shop-modal').classList.add('show'); _openUp(); };
+
+// ---------- RESIZE ----------
+window.addEventListener('resize', ()=>{
+  if (G) {
+    const canvas=document.getElementById('game-canvas'), wrap=document.getElementById('canvas-wrap');
+    canvas.width=wrap.clientWidth; canvas.height=wrap.clientHeight;
+    canvasW=canvas.width; canvasH=canvas.height;
+    PATH_POINTS=buildPath(G.mapKey,canvasW,canvasH);
+    OBSTACLES=buildObstacles(G.mapKey,canvasW,canvasH);
+  }
+});
+window.addEventListener('keydown', e=>{
+  if (!G) return;
+  if (e.key==='Escape'){ G.placingTower=null; if(G.selectedTower) deselectTower(); }
+  if (e.key===' '){ e.preventDefault(); if(!G.waveActive && !G.gameOver) startWave(); }
+});
+
+// hero xp on kill: patch killEnemy to grant XP
+(function(){
+  const orig = killEnemy;
+  killEnemy = function(enemy, award=true) {
+    const wasMoab = enemy && enemy.def && enemy.def.isMoab;
+    const cash = enemy && enemy.def ? enemy.def.cash : 0;
+    orig(enemy, award);
+    if (G) gainHeroXP(Math.max(1, Math.round(cash/3)));
+  };
+})();
+
+// ---------- INIT ----------
+loadProfile();
