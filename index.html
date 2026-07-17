@@ -152,11 +152,11 @@
   .upgrade-btn.locked-tier { border-color:var(--danger); color:var(--text-dim); cursor:not-allowed; opacity:0.6; }
   .upgrade-btn:disabled:not(.maxed):not(.locked-tier) { opacity: 0.4; cursor: not-allowed; }
   .upgrade-btn-cost { font-family: 'Orbitron', sans-serif; color: var(--gold); font-size: 0.62rem; }
-  .sell-btn { width: 100%; padding: 0.5rem; background: rgba(255,34,68,0.15); border: 1px solid var(--danger); color: var(--danger); cursor: pointer; font-size: 0.72rem; font-family: 'Orbitron', sans-serif; margin-top: 0.5rem; transition: all 0.15s; }
+  .sell-btn { width: 100%; padding: 0.5rem; background: rgba(255,34,68,0.15); border: 1px solid var(--danger); color: var(--danger); cursor: pointer; font-size: 0.72rem; font-family: 'Orbitron', sans-serif; }
   .sell-btn:hover { background: rgba(255,34,68,0.3); }
   .target-btn { width:100%; padding:0.4rem; background:var(--panel2); border:1px solid var(--border); color:var(--accent); cursor:pointer; font-size:0.68rem; margin-top:0.4rem; font-family:'Orbitron',sans-serif; }
   .target-btn:hover { border-color:var(--accent); }
-  .ability-btn { width:100%; padding:0.5rem; background:rgba(255,77,166,0.15); border:1px solid var(--hero); color:var(--hero); cursor:pointer; font-size:0.7rem; font-family:'Orbitron',sans-serif; margin-top:0.5rem; }
+  .ability-btn { width:100%; padding:0.5rem; background:rgba(255,77,166,0.15); border:1px solid var(--hero); color:var(--hero); cursor:pointer; font-size:0.7rem; font-family:'Orbitron',sans-serif; }
   .ability-btn:disabled { opacity:0.4; cursor:not-allowed; }
   .deselect-btn { width: 100%; padding: 0.4rem; background: transparent; border: 1px solid var(--border); color: var(--text-dim); cursor: pointer; font-size: 0.7rem; margin-top: 0.3rem; }
   .deselect-btn:hover { border-color: var(--text-dim); }
@@ -188,7 +188,7 @@
   ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
   #panel-content, #upgrade-panel { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
 
-  .section-title { font-family: 'Orbitron', sans-serif; font-size: 0.62rem; color: var(--text-dim); letter-spacing: 0.15em; text-transform: uppercase; margin: 0.6rem 0 0.5rem; padding-bottom: 0.3rem; border-bottom: 1px solid var(--border); }
+  .section-title { font-family: 'Orbitron', sans-serif; font-size: 0.62rem; color: var(--text-dim); letter-spacing: 0.15em; text-transform: uppercase; margin: 0.6rem 0 0.5rem; padding-bottom: 0.3rem; }
 
   /* Modal */
   .modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:1000; align-items:center; justify-content:center; }
@@ -196,7 +196,7 @@
   .modal-box { background:var(--panel); border:1px solid var(--border); padding:1.5rem; width:520px; max-width:95vw; max-height:90vh; overflow-y:auto; box-shadow:0 0 40px rgba(0,212,255,0.2); }
   .modal-title { font-family:'Orbitron',sans-serif; font-size:1rem; color:var(--accent); margin-bottom:1rem; display:flex; justify-content:space-between; align-items:center; }
   .modal-close { background:transparent; border:none; color:var(--text-dim); cursor:pointer; font-size:1.2rem; }
-  textarea.code-box { width:100%; height:90px; background:var(--bg); border:1px solid var(--border); color:var(--accent3); font-family:monospace; font-size:0.7rem; padding:0.5rem; resize:none; word-break:break-all; }
+  textarea.code-box { width:100%; height:90px; background:var(--bg); border:1px solid var(--border); color:var(--accent3); font-family:monospace; font-size:0.7rem; padding:0.5rem; resize:none; word-wrap:break-word; }
 
   /* Sandbox admin panel */
   #sandbox-panel { position:absolute; top:60px; left:10px; background:rgba(10,14,26,0.95); border:1px solid var(--hero); padding:0.8rem; width:220px; z-index:60; display:none; max-height:80%; overflow-y:auto; }
@@ -223,7 +223,7 @@
   <div class="menu-subtitle">Tower Defense</div>
   <div class="mm-display">💰 <span id="menu-mm">0</span> Monkey Money</div>
   <div class="menu-buttons">
-    <button class="btn" onclick="goToDifficulty('normal')">⚔ Play</button>
+    <button class="btn" onclick="goToDifficulty()">⚔ Play</button>
     <button class="btn btn-hero" onclick="showScreen('sandbox-select-screen')">🧪 Sandbox</button>
     <button class="btn btn-gold" onclick="openUpgradeShop()">⬆ Upgrade Shop</button>
     <button class="btn btn-green" onclick="showLoadFromMenu()">📂 Load Save</button>
